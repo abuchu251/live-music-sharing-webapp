@@ -6,7 +6,6 @@ import type {
   InterServerEvents,
   SocketData,
 } from "@synctune/shared-types";
-import { env } from "../config/env.js";
 import { registerRoomHandlers } from "./handlers/roomHandler.js";
 import { registerPlaybackHandlers } from "./handlers/playbackHandler.js";
 import { registerSocialHandlers } from "./handlers/socialHandler.js";
@@ -21,7 +20,7 @@ export type SocketServer = Server<
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io: SocketServer = new Server(httpServer, {
     cors: {
-      origin: (origin, callback) => callback(null, true),
+      origin: (_origin, callback) => callback(null, true),
       methods: ["GET", "POST"],
       credentials: true,
     },
