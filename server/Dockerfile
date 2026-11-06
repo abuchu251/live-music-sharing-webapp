@@ -31,21 +31,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Copy root workspace configurations
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared-types/package.json ./packages/shared-types/
-COPY packages/shared-types/dist ./packages/shared-types/dist
-COPY server/package.json ./server/
-COPY server/prisma ./server/prisma
-
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
-
-# Copy generated Prisma Client and compiled server code
-COPY --from=builder /app/node_modules/.pnpm /app/node_modules/.pnpm
+# Copy compiled artifacts & node_modules from builder
+COPY package.json pnpm-workspace.yaml ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared-types ./packages/shared-types
 COPY --from=builder /app/server/dist ./server/dist
+COPY --from=builder /app/server/package.json ./server/package.json
+COPY --from=builder /app/server/prisma ./server/prisma
 
 # Use non-root user
 USER node
@@ -53,4 +45,3 @@ USER node
 EXPOSE 3001
 
 CMD ["node", "server/dist/index.js"]
-
