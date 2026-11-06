@@ -35,13 +35,13 @@ ENV PORT=3001
 COPY package.json pnpm-workspace.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared-types ./packages/shared-types
-COPY --from=builder /app/server/dist ./server/dist
-COPY --from=builder /app/server/package.json ./server/package.json
-COPY --from=builder /app/server/prisma ./server/prisma
+COPY --from=builder /app/server ./server
+
+WORKDIR /app/server
 
 # Use non-root user
 USER node
 
 EXPOSE 3001
 
-CMD ["node", "server/dist/index.js"]
+CMD ["node", "dist/index.js"]
