@@ -1,0 +1,400 @@
+import React, { useState } from "react";
+import {
+  ListMusic,
+  Users,
+  MessageSquare,
+  Copy,
+  Check,
+  Plus,
+  Send,
+  Trash2,
+  Crown,
+  Share2,
+} from "lucide-react";
+import { extractYouTubeVideoId } from "../../utils/youtube";
+import { Badge } from "../../components/ui/Badge";
+import type { QueueItem, ChatMessage } from "@synctune/shared-types";
+import type { MockParticipant } from "./mockData";
+
+export interface RoomSidebarProps {
+  roomId: string;
+  roomName: string;
+  isHost: boolean;
+  currentUser: { username: string; avatar: string };
+  queue: QueueItem[];
+  participants: MockParticipant[];
+  chatMessages: ChatMessage[];
+  onAddSong: (title: string, videoId: string) => void;
+  onRemoveSong: (songId: string) => void;
+  onSendMessage: (content: string) => void;
+}
+
+export const RoomSidebar: React.FC<RoomSidebarProps> = ({
+  roomId,
+  roomName,
+  isHost,
+  currentUser,
+  queue,
+  participants,
+  chatMessages,
+  onAddSong,
+  onRemoveSong,
+  onSendMessage,
+}) => {
+  const [activeTab, setActiveTab] = useState<"queue" | "participants" | "chat">("queue");
+  const [copied, setCopied] = useState(false);
+  const [newSongInput, setNewSongInput] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const handleCopyLink = () => {
+    const inviteUrl = `${window.location.origin}/room/${roomId}`;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleAddSongSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const rawInput = newSongInput.trim();
+    if (!rawInput) return;
+
+    const extractedId = extractYouTubeVideoId(rawInput);
+    const videoId = extractedId || "jfKfPfyJRdk";
+    const title = extractedId ? `YouTube Track (${extractedId})` : rawInput;
+
+    onAddSong(title, videoId);
+    setNewSongInput("");
+    setShowAddForm(false);
+  };
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    onSendMessage(chatInput.trim());
+    setChatInput("");
+  };
+
+  return (
+    <div className="w-full h-full flex flex-col rounded-3xl bg-zinc-900/90 border border-zinc-800 shadow-xl overflow-hidden backdrop-blur-md">
+      {/* Room Header Info */}
+      <div className="p-4 border-b border-zinc-800 space-y-3 bg-zinc-950/40">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
+              Listening Room
+            </span>
+            <h3 className="text-base font-bold text-white truncate">
+              {roomName}
+            </h3>
+            <p className="text-xs text-zinc-400 font-mono">ID: {roomId}</p>
+          </div>
+
+          <button
+            onClick={handleCopyLink}
+            className={`p-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer ${
+              copied
+                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                : "bg-zinc-800 hover:bg-zinc-700/80 border-zinc-700 text-zinc-300 hover:text-white"
+            }`}
+            title="Copy invitation link"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Share</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-medium">
+          <button
+            onClick={() => setActiveTab("queue")}
+            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === "queue"
+                ? "bg-purple-600 text-white shadow-sm font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <ListMusic className="w-3.5 h-3.5" />
+            <span>Queue ({queue.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("participants")}
+            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === "participants"
+                ? "bg-purple-600 text-white shadow-sm font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>People ({participants.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === "chat"
+                ? "bg-purple-600 text-white shadow-sm font-semibold"
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Chat</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tab 1: Queue Content */}
+      {activeTab === "queue" && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Upcoming Tracks
+            </span>
+            <button
+              onClick={() => setShowAddForm((prev) => !prev)}
+              className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{showAddForm ? "Cancel" : "Add Song"}</span>
+            </button>
+          </div>
+
+          {/* Add Song Form */}
+          {showAddForm && (
+            <form
+              onSubmit={handleAddSongSubmit}
+              className="p-3 rounded-2xl bg-zinc-950 border border-purple-500/30 space-y-2.5 animate-in fade-in"
+            >
+              <input
+                type="text"
+                placeholder="Paste YouTube URL or song name..."
+                value={newSongInput}
+                onChange={(e) => setNewSongInput(e.target.value)}
+                className="w-full text-xs rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1 text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-sm cursor-pointer"
+                >
+                  Queue Song
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Queue Items */}
+          <div className="space-y-2">
+            {queue.map((song, index) => (
+              <div
+                key={song.id}
+                className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-zinc-950/60 hover:bg-zinc-800/60 border border-zinc-800/80 hover:border-zinc-700 transition-all"
+              >
+                <span className="w-5 text-center text-xs font-mono text-zinc-500">
+                  {index + 1}
+                </span>
+
+                <img
+                  src={song.thumbnailUrl}
+                  alt={song.title}
+                  className="w-11 h-11 rounded-xl object-cover shrink-0"
+                />
+
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-semibold text-zinc-100 truncate group-hover:text-purple-300 transition-colors">
+                    {song.title}
+                  </h4>
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                    <span className="truncate">{song.artist}</span>
+                    <span>•</span>
+                    <span>{Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, "0")}</span>
+                  </div>
+                </div>
+
+                {isHost && (
+                  <button
+                    onClick={() => onRemoveSong(song.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
+                    title="Remove from queue"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {queue.length === 0 && (
+              <div className="py-8 text-center text-zinc-500 text-xs">
+                Queue is empty. Click "+ Add Song" to queue the next track!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Participants Content */}
+      {activeTab === "participants" && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Connected Listeners ({participants.length})
+            </span>
+            <Badge variant="emerald" size="sm" dot>
+              Live Sync
+            </Badge>
+          </div>
+
+          <div className="space-y-2">
+            {participants.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="text-xl">{p.avatar}</div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-zinc-100">
+                        {p.username}
+                      </span>
+                      {p.username === currentUser.username && (
+                        <span className="text-[10px] text-purple-400 font-mono">(you)</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          p.status === "online"
+                            ? "bg-emerald-400"
+                            : p.status === "buffering"
+                            ? "bg-amber-400 animate-pulse"
+                            : "bg-zinc-500"
+                        }`}
+                      />
+                      <span>{p.status}</span>
+                      <span>•</span>
+                      <span className="font-mono text-zinc-500">{p.ping}ms</span>
+                    </div>
+                  </div>
+                </div>
+
+                {p.role === "HOST" ? (
+                  <Badge variant="amber" size="sm">
+                    <Crown className="w-3 h-3 mr-1 inline text-amber-400" />
+                    Host
+                  </Badge>
+                ) : (
+                  <Badge variant="zinc" size="sm">
+                    Listener
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Invite Box */}
+          <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center space-y-2">
+            <Share2 className="w-5 h-5 text-purple-400 mx-auto" />
+            <h5 className="text-xs font-semibold text-purple-200">
+              Invite friends to this room
+            </h5>
+            <p className="text-[11px] text-purple-300/80">
+              Anyone with this link can watch and listen in exact synchronization.
+            </p>
+            <button
+              onClick={handleCopyLink}
+              className="w-full py-1.5 text-xs font-medium rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 cursor-pointer"
+            >
+              {copied ? "Link Copied!" : "Copy Room Link"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Chat Content */}
+      {activeTab === "chat" && (
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {chatMessages.map((msg) => {
+              const formattedTime =
+                typeof msg.timestamp === "number"
+                  ? new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : msg.timestamp;
+
+              return (
+                <div key={msg.id} className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">{msg.senderAvatar}</span>
+                    <span className="text-xs font-semibold text-zinc-200">
+                      {msg.senderUsername}
+                    </span>
+                    {msg.isHost && (
+                      <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.2 rounded font-medium">
+                        Host
+                      </span>
+                    )}
+                    <span className="text-[10px] text-zinc-500 font-mono">
+                      {formattedTime}
+                    </span>
+                  </div>
+                  <p
+                    className="text-xs text-zinc-300 pl-6 leading-relaxed bg-zinc-950/40 p-2 rounded-xl border border-zinc-800/50 break-words"
+                    dangerouslySetInnerHTML={{ __html: msg.content }}
+                  />
+                </div>
+              );
+            })}
+
+            {chatMessages.length === 0 && (
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                No chat messages yet. Say hello to everyone! 👋
+              </div>
+            )}
+          </div>
+
+          {/* Chat Input Bar */}
+          <form
+            onSubmit={handleSendChat}
+            className="p-3 border-t border-zinc-800 bg-zinc-950/60 flex items-center gap-2"
+          >
+            <input
+              type="text"
+              placeholder="Send a message to the room..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              maxLength={200}
+              className="flex-1 text-xs rounded-xl bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+            />
+            <button
+              type="submit"
+              disabled={!chatInput.trim()}
+              className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:hover:bg-purple-600 text-white transition-all cursor-pointer"
+              aria-label="Send message"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+};

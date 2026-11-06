@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+.env
+.env.local
+dist
+coverage
+scratch
+*.log
+.DS_Store
+Thumbs.db
+

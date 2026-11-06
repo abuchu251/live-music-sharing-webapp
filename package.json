@@ -1,0 +1,24 @@
+{
+  "name": "synctune",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Synchronized music listening platform",
+  "scripts": {
+    "dev": "concurrently -n \"server,web\" -c \"cyan,magenta\" \"pnpm run dev:server\" \"pnpm run dev:web\"",
+    "dev:web": "pnpm --filter @synctune/web dev",
+    "dev:server": "pnpm --filter @synctune/server dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "pnpm -r run build",
+    "build:types": "pnpm --filter @synctune/shared-types build",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

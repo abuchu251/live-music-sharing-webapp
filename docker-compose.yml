@@ -1,0 +1,69 @@
+services:
+  # ─── PostgreSQL Database ────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: synctune-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: synctune
+      POSTGRES_PASSWORD: synctune_secure_password_2026
+      POSTGRES_DB: synctune
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synctune -d synctune"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - synctune-network
+
+  # ─── SyncTune Backend Server ────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: synctune-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://synctune:synctune_secure_password_2026@db:5432/synctune?schema=public
+      JWT_SECRET: production-secret-synctune-jwt-key-change-in-prod
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:8080
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - synctune-network
+
+  # ─── SyncTune Web Frontend (Nginx) ──────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: synctune-web
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+    networks:
+      - synctune-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  synctune-network:
+    driver: bridge
+

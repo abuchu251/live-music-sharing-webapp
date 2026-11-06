@@ -1,0 +1,25 @@
+import { defineConfig } from "vitest/config";
+import { resolve } from "path";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+    include: [
+      "packages/**/*.test.ts",
+      "server/**/*.test.ts",
+      "apps/web/src/**/*.test.ts",
+      "tests/**/*.test.ts",
+    ],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+    },
+  },
+  resolve: {
+    alias: {
+      "@synctune/shared-types": resolve(__dirname, "packages/shared-types/src/index.ts"),
+    },
+  },
+});
+
