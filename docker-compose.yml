@@ -34,7 +34,7 @@ services:
       DATABASE_URL: postgresql://synctune:synctune_secure_password_2026@db:5432/synctune?schema=public
       JWT_SECRET: production-secret-synctune-jwt-key-change-in-prod
       JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: http://localhost:8080
+      CORS_ORIGIN: "*"
     expose:
       - "3001"
     healthcheck:
@@ -55,7 +55,8 @@ services:
     depends_on:
       - server
     ports:
-      - "8080:80"
+      - "80:80"
+      - "3000:80"
     networks:
       - synctune-network
 
@@ -66,4 +67,3 @@ volumes:
 networks:
   synctune-network:
     driver: bridge
-

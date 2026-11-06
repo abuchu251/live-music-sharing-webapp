@@ -21,7 +21,7 @@ export type SocketServer = Server<
 export function createSocketServer(httpServer: HttpServer): SocketServer {
   const io: SocketServer = new Server(httpServer, {
     cors: {
-      origin: env.corsOrigin,
+      origin: (origin, callback) => callback(null, true),
       methods: ["GET", "POST"],
       credentials: true,
     },
