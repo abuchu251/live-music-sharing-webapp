@@ -44,12 +44,16 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: 22
+          command_timeout: 30m
+          timeout: 30m
           script_stop: true
           script: |
             echo "Starting SyncTune continuous deployment..."
             cd /home/ubuntu/synctune
             git pull origin main
-            docker compose build
+            echo "Building containers sequentially to prevent memory thrashing..."
+            docker compose build web
+            docker compose build server
             docker compose up -d --remove-orphans
             docker exec synctune-server npx prisma db push --skip-generate
             echo "SyncTune deployed successfully!"
