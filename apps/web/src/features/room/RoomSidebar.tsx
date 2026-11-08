@@ -64,6 +64,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   const [newSongInput, setNewSongInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (replyPrefill) {
@@ -71,6 +72,12 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
       if (onClearReplyPrefill) onClearReplyPrefill();
     }
   }, [replyPrefill, onClearReplyPrefill]);
+
+  React.useEffect(() => {
+    if (activeTab === "chat") {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, activeTab]);
 
   const handleCopyRoomCode = () => {
     navigator.clipboard.writeText(roomId).then(() => {
@@ -134,12 +141,12 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
             {copiedCode ? (
               <>
                 <Check className="w-3 h-3 text-emerald-400" />
-                <span>Copied Code!</span>
+                <span>Copied! 🎉</span>
               </>
             ) : (
               <>
                 <Copy className="w-3 h-3 text-zinc-400" />
-                <span className="max-w-[120px] truncate">ID: {roomId}</span>
+                <span className="max-w-[120px] truncate">Click to copy</span>
               </>
             )}
           </button>
@@ -364,9 +371,20 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
             </p>
             <button
               onClick={handleCopyLink}
-              className="w-full py-1.5 text-xs font-medium rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 cursor-pointer"
+              title="Click to copy room link"
+              className="w-full py-1.5 text-xs font-medium rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-1.5"
             >
-              {copiedLink ? "Link Copied!" : "Copy Room Link"}
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Copied! 🎉</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Click to copy link</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -397,6 +415,13 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                     <span className="text-[10px] text-zinc-500 font-mono">
                       {formattedTime}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setChatInput(`@${msg.senderUsername} `)}
+                      className="text-[10px] text-zinc-500 hover:text-purple-400 cursor-pointer ml-auto transition-colors"
+                    >
+                      Reply
+                    </button>
                   </div>
                   <p
                     className="text-xs text-zinc-300 pl-6 leading-relaxed bg-zinc-950/40 p-2 rounded-xl border border-zinc-800/50 break-words"
@@ -411,6 +436,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 No chat messages yet. Say hello to everyone! 👋
               </div>
             )}
+            <div ref={chatEndRef} />
           </div>
 
           {/* Quick Reactions Bar */}

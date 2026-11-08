@@ -22,6 +22,8 @@ import { connectSocket, getSocket } from "../services/socket";
 import type { Room, Participant, RoomStatus, QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "../features/room/mockData";
 
+const AVATAR_PRESETS = ["🎧", "🎵", "🎸", "🎹", "🎷", "🎺", "🥁", "🎤", "👾", "✨", "🦊", "🚀"];
+
 export const ListeningRoomPage: React.FC = () => {
   const { roomId = "" } = useParams<{ roomId: string }>();
   const location = useLocation();
@@ -36,23 +38,34 @@ export const ListeningRoomPage: React.FC = () => {
     participantId?: string;
   };
 
-  const storedParticipantId =
-    localStorage.getItem(`synctune:participantId:${roomId}`) ||
-    sessionStorage.getItem(`synctune:participantId:${roomId}`);
-  const storedUsername =
-    localStorage.getItem(`synctune:username:${roomId}`) ||
-    sessionStorage.getItem(`synctune:username:${roomId}`);
-  const storedAvatar =
-    localStorage.getItem(`synctune:avatar:${roomId}`) ||
-    sessionStorage.getItem(`synctune:avatar:${roomId}`);
+  // Strictly isolate participant IDs to sessionStorage so different tabs don't impersonate each other
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(`synctune:participantId:${roomId}`);
+  }
 
-  const [username] = useState(
-    locationState.username || storedUsername || `User-${Math.floor(Math.random() * 900 + 100)}`
-  );
-  const [avatar] = useState(locationState.avatar || storedAvatar || "🎧");
+  const storedParticipantId = sessionStorage.getItem(`synctune:participantId:${roomId}`);
+  const storedUsername = sessionStorage.getItem(`synctune:username:${roomId}`);
+  const storedAvatar = sessionStorage.getItem(`synctune:avatar:${roomId}`);
+
+  const initialUsername = locationState.username || storedUsername || "";
+  const initialAvatar =
+    locationState.avatar ||
+    storedAvatar ||
+    localStorage.getItem("synctune:pref:avatar") ||
+    AVATAR_PRESETS[0] || "🎧";
+
+  const [username, setUsername] = useState(initialUsername);
+  const [avatar, setAvatar] = useState(initialAvatar);
   const [participantId, setParticipantId] = useState<string | null>(
     locationState.participantId || storedParticipantId || null
   );
+
+  // If user opens link directly without a chosen username, prompt them first!
+  const [needsNamePrompt, setNeedsNamePrompt] = useState(!initialUsername);
+  const [promptName, setPromptName] = useState(
+    localStorage.getItem("synctune:pref:username") || ""
+  );
+  const [promptAvatar, setPromptAvatar] = useState(initialAvatar);
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -63,6 +76,8 @@ export const ListeningRoomPage: React.FC = () => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [chatToast, setChatToast] = useState<ChatMessage | null>(null);
+  const [hostPromotedToast, setHostPromotedToast] = useState(false);
+  const [isPlaylistFinished, setIsPlaylistFinished] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"queue" | "participants" | "chat">("queue");
   const [replyPrefill, setReplyPrefill] = useState<string>("");
 
@@ -75,8 +90,45 @@ export const ListeningRoomPage: React.FC = () => {
   const isHost = Boolean(room && participantId && room.hostId === participantId);
   const currentSong = queue[currentSongIndex] || null;
 
+  // Pre-fetch room info when prompt is visible so user sees the room name
+  useEffect(() => {
+    if (!roomId) return;
+    getRoom(roomId)
+      .then(({ room: fetchedRoom }) => {
+        setRoom(fetchedRoom);
+        if (needsNamePrompt) setIsLoading(false);
+      })
+      .catch((err) => {
+        if (needsNamePrompt) {
+          setError(err instanceof Error ? err.message : "Failed to load room.");
+          setIsLoading(false);
+        }
+      });
+  }, [roomId, needsNamePrompt]);
+
+  // Handle joining after listener provides their name
+  const handleJoinPromptSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = promptName.trim();
+    if (!cleanName) return;
+
+    localStorage.setItem("synctune:pref:username", cleanName);
+    localStorage.setItem("synctune:pref:avatar", promptAvatar);
+    sessionStorage.setItem(`synctune:username:${roomId}`, cleanName);
+    sessionStorage.setItem(`synctune:avatar:${roomId}`, promptAvatar);
+
+    setUsername(cleanName);
+    setAvatar(promptAvatar);
+    setNeedsNamePrompt(false);
+    setIsLoading(true);
+  };
+
   // Initialize Room & Socket.IO Connection
   useEffect(() => {
+    if (needsNamePrompt || !username) {
+      return;
+    }
+
     let isMounted = true;
 
     async function initRoom() {
@@ -122,11 +174,9 @@ export const ListeningRoomPage: React.FC = () => {
               if (res.room.currentPlaybackState?.revision) {
                 playbackRevisionRef.current = res.room.currentPlaybackState.revision;
               }
-              localStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
+              // SessionStorage isolates this specific tab's participant
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
-              localStorage.setItem(`synctune:username:${roomId}`, username);
               sessionStorage.setItem(`synctune:username:${roomId}`, username);
-              localStorage.setItem(`synctune:avatar:${roomId}`, avatar);
               sessionStorage.setItem(`synctune:avatar:${roomId}`, avatar);
               setIsConnected(true);
               setIsLoading(false);
@@ -146,7 +196,10 @@ export const ListeningRoomPage: React.FC = () => {
         // Listen for new chat messages & trigger notification toast
         socket.on("chat:message", (newMsg) => {
           if (!isMounted) return;
-          setChatMessages((prev) => [...prev, newMsg]);
+          setChatMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
           if (newMsg.senderUsername !== username) {
             setChatToast(newMsg);
           }
@@ -170,7 +223,7 @@ export const ListeningRoomPage: React.FC = () => {
           setParticipants((prev) => prev.filter((p) => p.id !== leftId));
         });
 
-        // Listen for participant connection updates (disconnect/reconnect, host promotion)
+        // Listen for participant connection updates (disconnect/reconnect, automatic host promotion)
         socket.on("room:participant-updated", (updatedParticipant) => {
           if (!isMounted) return;
           setParticipants((prev) =>
@@ -178,6 +231,10 @@ export const ListeningRoomPage: React.FC = () => {
           );
           if (updatedParticipant.role === "HOST") {
             setRoom((prev) => (prev ? { ...prev, hostId: updatedParticipant.id } : prev));
+            // Real-time host promotion without reload
+            if (updatedParticipant.id === participantId) {
+              setHostPromotedToast(true);
+            }
           }
         });
 
@@ -187,11 +244,21 @@ export const ListeningRoomPage: React.FC = () => {
           setRoomStatus(status);
         });
 
-        // Listen for playback state updates to keep revision in sync
+        // Listen for playback state updates to keep revision and current track in sync
         socket.on("playback:state-update", (state) => {
           if (!isMounted) return;
           if (state?.revision) {
             playbackRevisionRef.current = state.revision;
+          }
+          if (state?.videoId) {
+            setQueue((currQueue) => {
+              const foundIdx = currQueue.findIndex((q) => q.videoId === state.videoId);
+              if (foundIdx !== -1) {
+                setCurrentSongIndex(foundIdx);
+                setIsPlaylistFinished(false);
+              }
+              return currQueue;
+            });
           }
         });
 
@@ -226,7 +293,7 @@ export const ListeningRoomPage: React.FC = () => {
       socket.off("chat:message");
       socket.off("playback:state-update");
     };
-  }, [roomId, username, avatar]);
+  }, [roomId, username, avatar, needsNamePrompt, participantId]);
 
   const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
     const socket = getSocket();
@@ -247,11 +314,26 @@ export const ListeningRoomPage: React.FC = () => {
 
   const handleNextTrack = useCallback(() => {
     if (!isHost || queue.length === 0) return;
-    const nextIndex = currentSongIndex < queue.length - 1 ? currentSongIndex + 1 : 0;
-    setCurrentSongIndex(nextIndex);
-    const nextSong = queue[nextIndex];
-    if (nextSong) {
-      handleChangeVideo(nextSong.videoId, nextSong.title);
+    if (currentSongIndex < queue.length - 1) {
+      const nextIndex = currentSongIndex + 1;
+      setCurrentSongIndex(nextIndex);
+      setIsPlaylistFinished(false);
+      const nextSong = queue[nextIndex];
+      if (nextSong) {
+        handleChangeVideo(nextSong.videoId, nextSong.title);
+      }
+    } else {
+      // Reached the end of the playlist!
+      console.log("[Queue] Playlist finished.");
+      setIsPlaylistFinished(true);
+      const socket = getSocket();
+      socket.emit("playback:command", {
+        type: "pause",
+        payload: { position: 0 },
+        revision: playbackRevisionRef.current,
+      }, (res) => {
+        if (!res.ok) console.error("Failed to pause at end of queue:", res.error);
+      });
     }
   }, [currentSongIndex, queue, isHost, handleChangeVideo]);
 
@@ -259,15 +341,27 @@ export const ListeningRoomPage: React.FC = () => {
     if (!isHost || queue.length === 0) return;
     const prevIndex = currentSongIndex > 0 ? currentSongIndex - 1 : queue.length - 1;
     setCurrentSongIndex(prevIndex);
+    setIsPlaylistFinished(false);
     const prevSong = queue[prevIndex];
     if (prevSong) {
       handleChangeVideo(prevSong.videoId, prevSong.title);
     }
   }, [currentSongIndex, queue, isHost, handleChangeVideo]);
 
+  const handleReplayPlaylist = useCallback(() => {
+    if (!isHost || queue.length === 0) return;
+    setCurrentSongIndex(0);
+    setIsPlaylistFinished(false);
+    const firstSong = queue[0];
+    if (firstSong) {
+      handleChangeVideo(firstSong.videoId, firstSong.title);
+    }
+  }, [isHost, queue, handleChangeVideo]);
+
   const handlePlayQueuedSong = useCallback((song: QueueItem, index: number) => {
     if (!isHost) return;
     setCurrentSongIndex(index);
+    setIsPlaylistFinished(false);
     handleChangeVideo(song.videoId, song.title);
   }, [isHost, handleChangeVideo]);
 
@@ -333,6 +427,80 @@ export const ListeningRoomPage: React.FC = () => {
     ping: 28,
   }));
 
+  // Listener Join Prompt: If user visited via invite link without setting a name, prompt them first
+  if (needsNamePrompt) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-purple-600/30">
+              <Radio className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Join Listening Room</h2>
+            <p className="text-xs text-zinc-400">
+              {room?.name ? (
+                <>You're invited to join <strong className="text-zinc-200">"{room.name}"</strong></>
+              ) : (
+                "Enter your nickname to join the live synchronized music session."
+              )}
+            </p>
+          </div>
+
+          <form onSubmit={handleJoinPromptSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300">Your Display Name</label>
+              <input
+                type="text"
+                required
+                maxLength={24}
+                autoFocus
+                placeholder="Enter your name or nickname..."
+                value={promptName}
+                onChange={(e) => setPromptName(e.target.value)}
+                className="w-full text-sm rounded-xl bg-zinc-950 border border-zinc-700 px-3.5 py-2.5 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-300">Choose Your Avatar</label>
+              <div className="grid grid-cols-6 gap-2">
+                {AVATAR_PRESETS.map((av) => (
+                  <button
+                    key={av}
+                    type="button"
+                    onClick={() => setPromptAvatar(av)}
+                    className={`text-xl p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                      promptAvatar === av
+                        ? "bg-purple-600/20 border-purple-500 ring-2 ring-purple-500/40"
+                        : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+                    }`}
+                  >
+                    {av}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!promptName.trim()}
+              className="w-full py-3 text-sm font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+            >
+              <span>Join Room & Listen Live</span>
+              <Sparkles className="w-4 h-4" />
+            </button>
+          </form>
+
+          <div className="text-center pt-1">
+            <Link to="/" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+              ← Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -396,16 +564,17 @@ export const ListeningRoomPage: React.FC = () => {
                 <div className="flex items-center gap-2 text-[11px] text-zinc-400">
                   <button
                     onClick={handleCopyRoomCode}
-                    className="font-mono hover:text-white flex items-center gap-1 bg-zinc-900 hover:bg-zinc-800 px-2 py-0.5 rounded-md border border-zinc-800 cursor-pointer transition-colors"
+                    className="font-mono hover:text-white flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 px-2.5 py-1 rounded-lg border border-zinc-800 cursor-pointer transition-colors text-xs"
                     title="Click to copy Room Code"
                   >
                     {copiedCode ? (
-                      <span className="text-emerald-400 flex items-center gap-1 font-semibold">
-                        <Check className="w-2.5 h-2.5" /> Copied Code!
+                      <span className="text-emerald-400 flex items-center gap-1.5 font-semibold">
+                        <Check className="w-3 h-3" /> Copied! 🎉
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-zinc-300">
-                        ID: {room.id} <Copy className="w-2.5 h-2.5 text-zinc-400" />
+                      <span className="flex items-center gap-1.5 text-zinc-300">
+                        <Copy className="w-3 h-3 text-zinc-400" />
+                        <span>Click to copy code</span>
                       </span>
                     )}
                   </button>
@@ -428,6 +597,7 @@ export const ListeningRoomPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
+              title="Click to copy invite link"
               leftIcon={
                 copiedLink ? (
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -437,7 +607,7 @@ export const ListeningRoomPage: React.FC = () => {
               }
               onClick={handleCopyInvite}
             >
-              {copiedLink ? "Link Copied!" : "Copy Link"}
+              {copiedLink ? "Copied! 🎉" : "Click to copy link"}
             </Button>
 
             {/* Current User Badge */}
@@ -457,6 +627,24 @@ export const ListeningRoomPage: React.FC = () => {
 
       {/* Main Room Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
+        {/* Host Promotion Notification Banner */}
+        {hostPromotedToast && (
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-xs text-amber-200 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <Crown className="w-5 h-5 text-amber-400 shrink-0" />
+              <span>
+                <strong>Host Succession:</strong> The previous host disconnected. You have been promoted to <strong>Room Host</strong> and now have full control of playback and the queue!
+              </span>
+            </div>
+            <button
+              onClick={() => setHostPromotedToast(false)}
+              className="px-2.5 py-1 bg-amber-500/30 hover:bg-amber-500/40 text-amber-100 rounded-lg text-xs font-medium cursor-pointer ml-3 transition-colors shrink-0"
+            >
+              Got it
+            </button>
+          </div>
+        )}
+
         {/* Host Disconnected Warning Banner */}
         {roomStatus === "host-disconnected" && (
           <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 animate-in fade-in">
@@ -489,9 +677,12 @@ export const ListeningRoomPage: React.FC = () => {
               currentSong={currentSong}
               isHost={isHost}
               initialPlaybackState={room.currentPlaybackState}
+              isPlaylistFinished={isPlaylistFinished}
               onNextTrack={handleNextTrack}
               onPreviousTrack={handlePreviousTrack}
               onChangeVideo={handleChangeVideo}
+              onReplayPlaylist={handleReplayPlaylist}
+              onOpenAddSong={() => setSidebarTab("queue")}
             />
 
             {/* Room Info & Status Cards */}

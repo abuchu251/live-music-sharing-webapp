@@ -32,7 +32,7 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     console.log(`[Socket] Client connected: ${socket.id}`);
 
     // Register domain event handlers
-    registerRoomHandlers(socket);
+    registerRoomHandlers(io, socket);
     registerPlaybackHandlers(io, socket);
     registerSocialHandlers(io, socket);
   });

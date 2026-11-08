@@ -57,13 +57,12 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
         avatar: selectedAvatar,
       });
 
-      // Save credentials for host session recovery across tabs & reloads
-      localStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
+      // Save credentials for host session in sessionStorage and user preferences
       sessionStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
-      localStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
       sessionStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
-      localStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
       sessionStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
+      localStorage.setItem("synctune:pref:username", username.trim());
+      localStorage.setItem("synctune:pref:avatar", selectedAvatar);
 
       onClose();
       navigate(`/room/${response.room.id}`, {

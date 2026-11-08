@@ -65,12 +65,11 @@ export const JoinRoomPage: React.FC = () => {
         avatar: selectedAvatar,
       });
 
-      localStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
       sessionStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
-      localStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
       sessionStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
-      localStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
       sessionStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
+      localStorage.setItem("synctune:pref:username", username.trim());
+      localStorage.setItem("synctune:pref:avatar", selectedAvatar);
 
       navigate(`/room/${response.room.id}`, {
         state: {
@@ -96,12 +95,11 @@ export const JoinRoomPage: React.FC = () => {
         avatar: selectedAvatar,
       });
 
-      localStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
       sessionStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
-      localStorage.setItem(`synctune:username:${response.room.id}`, finalUsername);
       sessionStorage.setItem(`synctune:username:${response.room.id}`, finalUsername);
-      localStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
       sessionStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
+      localStorage.setItem("synctune:pref:username", finalUsername);
+      localStorage.setItem("synctune:pref:avatar", selectedAvatar);
 
       navigate(`/room/${response.room.id}`, {
         state: {

@@ -89,6 +89,12 @@ export function usePlaybackSync({
             return;
           }
 
+          // Guard: If expected position exceeds duration, track has finished - do not seek past end!
+          const dur = player.getDuration();
+          if (dur > 0 && expectedPos >= dur - 0.5) {
+            return;
+          }
+
           // If paused locally, start playing
           const playerState = player.getPlayerState();
           if (playerState !== 1) { // 1 = PLAYING
@@ -161,7 +167,14 @@ export function usePlaybackSync({
       const player = playerRef.current;
       if (!player) return;
 
+      const dur = player.getDuration();
       const expectedPos = calculateExpectedPosition(playbackState);
+
+      // Guard: If expected position exceeds duration, track has reached the end - do not seek past end!
+      if (dur > 0 && expectedPos >= dur - 0.5) {
+        return;
+      }
+
       const currentPos = player.getCurrentTime();
       const drift = Math.abs(currentPos - expectedPos);
       setCurrentDrift(drift);

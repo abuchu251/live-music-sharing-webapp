@@ -1,4 +1,4 @@
-import type { Socket } from "socket.io";
+import type { Socket, Server } from "socket.io";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -14,7 +14,10 @@ export type TypedSocket = Socket<
   SocketData
 >;
 
-export function registerRoomHandlers(socket: TypedSocket): void {
+export function registerRoomHandlers(
+  io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>,
+  socket: TypedSocket
+): void {
   // Client joins a room
   socket.on("room:join", async (data, callback) => {
     try {
@@ -74,12 +77,19 @@ export function registerRoomHandlers(socket: TypedSocket): void {
       await socket.leave(roomId);
 
       if (result) {
-        socket.to(roomId).emit("room:participant-left", { participantId });
+        io.to(roomId).emit("room:participant-left", { participantId });
         if (result.promotedHost) {
-          socket.to(roomId).emit("room:participant-updated", result.promotedHost);
-          socket.to(roomId).emit("room:status-changed", { status: "active" });
+          // Promote socket role in-memory immediately without needing client reconnect
+          const sockets = await io.in(roomId).fetchSockets();
+          for (const s of sockets) {
+            if (s.data.participantId === result.promotedHost.id) {
+              s.data.role = "HOST";
+            }
+          }
+          io.to(roomId).emit("room:participant-updated", result.promotedHost);
+          io.to(roomId).emit("room:status-changed", { status: "active" });
         } else if (result.room.status === "host-disconnected") {
-          socket.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
+          io.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
         }
       }
 
@@ -110,14 +120,20 @@ export function registerRoomHandlers(socket: TypedSocket): void {
 
       if (result) {
         // Broadcast participant connection update
-        socket.to(roomId).emit("room:participant-updated", result.participant);
+        io.to(roomId).emit("room:participant-updated", result.participant);
 
-        // If a new participant was promoted to HOST, notify everyone
+        // If a new participant was promoted to HOST, notify everyone and upgrade socket role
         if (result.promotedHost) {
-          socket.to(roomId).emit("room:participant-updated", result.promotedHost);
-          socket.to(roomId).emit("room:status-changed", { status: "active" });
+          const sockets = await io.in(roomId).fetchSockets();
+          for (const s of sockets) {
+            if (s.data.participantId === result.promotedHost.id) {
+              s.data.role = "HOST";
+            }
+          }
+          io.to(roomId).emit("room:participant-updated", result.promotedHost);
+          io.to(roomId).emit("room:status-changed", { status: "active" });
         } else if (result.statusChanged && result.room.status === "host-disconnected") {
-          socket.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
+          io.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
         }
       }
     } catch (err) {

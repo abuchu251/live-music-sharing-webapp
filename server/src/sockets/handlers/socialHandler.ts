@@ -74,16 +74,19 @@ export function registerSocialHandlers(
 
   // Handle reordering the queue (Host only)
   socket.on("queue:reorder", async (data, callback) => {
-    const { roomId, role } = socket.data;
+    const { roomId, participantId, role } = socket.data;
     if (!roomId) {
       callback({ ok: false, error: "Must join a room first." });
       return;
     }
 
     try {
+      const roomInstance = await roomService.getRoom(roomId);
+      const isHost = role === "HOST" || (roomInstance && roomInstance.hostId === participantId);
+
       const { room } = await roomService.reorderQueue({
         roomId,
-        isHost: role === "HOST",
+        isHost,
         queueItemIds: data.queueItemIds,
       });
 

@@ -11,6 +11,7 @@ import {
   Sparkles,
   Link as LinkIcon,
   Radio,
+  Plus,
 } from "lucide-react";
 import { YouTubePlayer, type YouTubePlayerHandle } from "./YouTubePlayer";
 import { Badge } from "../ui/Badge";
@@ -23,9 +24,12 @@ export interface RoomPlayerProps {
   currentSong: QueueItem | SongItem | null;
   isHost: boolean;
   initialPlaybackState: PlaybackState;
+  isPlaylistFinished?: boolean;
   onNextTrack?: () => void;
   onPreviousTrack?: () => void;
   onChangeVideo?: (videoId: string, title?: string) => void;
+  onReplayPlaylist?: () => void;
+  onOpenAddSong?: () => void;
 }
 
 const PRESET_TRACKS = [
@@ -38,9 +42,12 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   currentSong,
   isHost,
   initialPlaybackState,
+  isPlaylistFinished = false,
   onNextTrack,
   onPreviousTrack,
   onChangeVideo,
+  onReplayPlaylist,
+  onOpenAddSong,
 }) => {
   const playerRef = useRef<YouTubePlayerHandle>(null);
 
@@ -172,6 +179,41 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             if (isHost && onNextTrack) onNextTrack();
           }}
         />
+
+        {/* Playlist Completed State Overlay */}
+        {isPlaylistFinished && (
+          <div className="absolute inset-0 bg-zinc-950/92 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 space-y-4 animate-in fade-in">
+            <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-xl shadow-purple-500/10">
+              <Sparkles className="w-8 h-8 text-purple-400" />
+            </div>
+            <div className="space-y-1.5 max-w-sm">
+              <h3 className="text-lg font-bold text-white">Queue Completed 🎉</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                All songs in the playlist have finished. Add more tracks to the queue or replay from the beginning to keep the listening party alive!
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              {isHost && onReplayPlaylist && (
+                <button
+                  type="button"
+                  onClick={onReplayPlaylist}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Replay Queue
+                </button>
+              )}
+              {onOpenAddSong && (
+                <button
+                  type="button"
+                  onClick={onOpenAddSong}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 text-purple-400" /> Add Songs
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Top Badges Overlay */}
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
