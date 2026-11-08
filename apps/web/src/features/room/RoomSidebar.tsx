@@ -10,6 +10,7 @@ import {
   Trash2,
   Crown,
   Share2,
+  Play,
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { Badge } from "../../components/ui/Badge";
@@ -27,6 +28,7 @@ export interface RoomSidebarProps {
   onAddSong: (title: string, videoId: string) => void;
   onRemoveSong: (songId: string) => void;
   onSendMessage: (content: string) => void;
+  onPlaySong?: (song: QueueItem, index: number) => void;
 }
 
 export const RoomSidebar: React.FC<RoomSidebarProps> = ({
@@ -40,6 +42,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onAddSong,
   onRemoveSong,
   onSendMessage,
+  onPlaySong,
 }) => {
   const [activeTab, setActiveTab] = useState<"queue" | "participants" | "chat">("queue");
   const [copied, setCopied] = useState(false);
@@ -231,13 +234,24 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 </div>
 
                 {isHost && (
-                  <button
-                    onClick={() => onRemoveSong(song.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
-                    title="Remove from queue"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onPlaySong && (
+                      <button
+                        onClick={() => onPlaySong(song, index)}
+                        className="p-1.5 text-zinc-400 hover:text-emerald-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
+                        title="Play this track now"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onRemoveSong(song.id)}
+                      className="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
+                      title="Remove from queue"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -369,6 +383,22 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 No chat messages yet. Say hello to everyone! 👋
               </div>
             )}
+          </div>
+
+          {/* Quick Reactions Bar */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-zinc-800/80 bg-zinc-950/70 overflow-x-auto">
+            <span className="text-[10px] text-zinc-500 font-medium">React:</span>
+            {["🔥", "❤️", "🎵", "👏", "⚡", "🚀", "🎉"].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => onSendMessage(emoji)}
+                className="text-xs px-1.5 py-0.5 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer active:scale-125"
+                title={`React ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
           </div>
 
           {/* Chat Input Bar */}

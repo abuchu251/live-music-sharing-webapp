@@ -36,19 +36,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
         {!isRoomPage && (
           <nav className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
             <a
-              href="#how-it-works"
+              href="/#how-it-works"
               className="hover:text-zinc-100 transition-colors"
             >
               How it works
             </a>
             <a
-              href="#features"
+              href="/#features"
               className="hover:text-zinc-100 transition-colors"
             >
               Features
             </a>
             <a
-              href="#preview"
+              href="/#preview"
               className="hover:text-zinc-100 transition-colors"
             >
               Live Demo
@@ -127,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
           )}
 
           <a
-            href="https://github.com"
+            href="https://github.com/abuchu251/live-music-sharing-webapp"
             target="_blank"
             rel="noreferrer"
             className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/60 transition-colors"

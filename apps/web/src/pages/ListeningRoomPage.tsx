@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate, Link } from "react-router";
 import {
   Radio,
@@ -59,6 +59,7 @@ export const ListeningRoomPage: React.FC = () => {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const playbackRevisionRef = useRef(0);
 
   const isHost = Boolean(room && participantId && room.hostId === participantId);
   const currentSong = queue[currentSongIndex] || null;
@@ -83,6 +84,9 @@ export const ListeningRoomPage: React.FC = () => {
         setParticipants(fetchedRoom.participants);
         setQueue(fetchedRoom.queue || []);
         setRoomStatus(fetchedRoom.status);
+        if (fetchedRoom.currentPlaybackState?.revision) {
+          playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision;
+        }
 
         // Connect Socket.IO
         const socket = connectSocket();
@@ -104,6 +108,9 @@ export const ListeningRoomPage: React.FC = () => {
               setQueue(res.room.queue || []);
               setRoomStatus(res.room.status);
               setParticipantId(res.participantId);
+              if (res.room.currentPlaybackState?.revision) {
+                playbackRevisionRef.current = res.room.currentPlaybackState.revision;
+              }
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
               setIsConnected(true);
               setIsLoading(false);
@@ -158,6 +165,14 @@ export const ListeningRoomPage: React.FC = () => {
           setRoomStatus(status);
         });
 
+        // Listen for playback state updates to keep revision in sync
+        socket.on("playback:state-update", (state) => {
+          if (!isMounted) return;
+          if (state?.revision) {
+            playbackRevisionRef.current = state.revision;
+          }
+        });
+
         // Connection state handlers
         socket.on("connect", () => {
           if (!isMounted) return;
@@ -187,34 +202,57 @@ export const ListeningRoomPage: React.FC = () => {
       socket.off("room:status-changed");
       socket.off("queue:updated");
       socket.off("chat:message");
+      socket.off("playback:state-update");
     };
   }, [roomId, username, avatar]);
 
-  const handleNextTrack = useCallback(() => {
-    if (currentSongIndex < queue.length - 1) {
-      setCurrentSongIndex((prev) => prev + 1);
-    } else {
-      setCurrentSongIndex(0);
-    }
-  }, [currentSongIndex, queue.length]);
-
-  const handlePreviousTrack = useCallback(() => {
-    if (currentSongIndex > 0) {
-      setCurrentSongIndex((prev) => prev - 1);
-    }
-  }, [currentSongIndex]);
-
-  const handleChangeVideo = (videoId: string, _title?: string) => {
+  const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
     const socket = getSocket();
     if (isHost) {
       socket.emit("playback:command", {
         type: "change-video",
         payload: { videoId, position: 0 },
-        revision: room?.currentPlaybackState.revision || 0,
+        revision: playbackRevisionRef.current,
       }, (res) => {
         if (!res.ok) console.error("Failed to change video:", res.error);
       });
     }
+    const foundIdx = queue.findIndex((q) => q.videoId === videoId);
+    if (foundIdx !== -1) {
+      setCurrentSongIndex(foundIdx);
+    }
+  }, [isHost, queue]);
+
+  const handleNextTrack = useCallback(() => {
+    if (!isHost || queue.length === 0) return;
+    const nextIndex = currentSongIndex < queue.length - 1 ? currentSongIndex + 1 : 0;
+    setCurrentSongIndex(nextIndex);
+    const nextSong = queue[nextIndex];
+    if (nextSong) {
+      handleChangeVideo(nextSong.videoId, nextSong.title);
+    }
+  }, [currentSongIndex, queue, isHost, handleChangeVideo]);
+
+  const handlePreviousTrack = useCallback(() => {
+    if (!isHost || queue.length === 0) return;
+    const prevIndex = currentSongIndex > 0 ? currentSongIndex - 1 : queue.length - 1;
+    setCurrentSongIndex(prevIndex);
+    const prevSong = queue[prevIndex];
+    if (prevSong) {
+      handleChangeVideo(prevSong.videoId, prevSong.title);
+    }
+  }, [currentSongIndex, queue, isHost, handleChangeVideo]);
+
+  const handlePlayQueuedSong = useCallback((song: QueueItem, index: number) => {
+    if (!isHost) return;
+    setCurrentSongIndex(index);
+    handleChangeVideo(song.videoId, song.title);
+  }, [isHost, handleChangeVideo]);
+
+  const handleLeaveRoom = () => {
+    const socket = getSocket();
+    socket.emit("room:leave");
+    navigate("/");
   };
 
   const handleAddSong = (title: string, videoId: string) => {
@@ -305,7 +343,7 @@ export const ListeningRoomPage: React.FC = () => {
           {/* Left: Brand & Room Name */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("/")}
+              onClick={handleLeaveRoom}
               className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
               title="Leave Room"
             >
@@ -452,6 +490,7 @@ export const ListeningRoomPage: React.FC = () => {
               onAddSong={handleAddSong}
               onRemoveSong={handleRemoveSong}
               onSendMessage={handleSendMessage}
+              onPlaySong={handlePlayQueuedSong}
             />
           </aside>
         </div>

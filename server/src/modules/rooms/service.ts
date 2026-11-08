@@ -10,8 +10,119 @@ import { IRoomRepository, roomRepository } from "./repository.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
 
+const DEMO_ROOM_CONFIGS: Record<
+  string,
+  {
+    name: string;
+    hostName: string;
+    avatar: string;
+    videoId: string;
+    tracks: Array<{ videoId: string; title: string; artist: string; duration: number }>;
+  }
+> = {
+  "preview-demo": {
+    name: "Late Night Lo-Fi Room",
+    hostName: "Maya",
+    avatar: "🎧",
+    videoId: "jfKfPfyJRdk",
+    tracks: [
+      { videoId: "jfKfPfyJRdk", title: "lofi hip hop radio - beats to relax/study to", artist: "Lofi Girl", duration: 3600 },
+      { videoId: "DWcJFNfaw9c", title: "Synthwave Radio - Chill Synth / Retro Beats", artist: "Lofi Records", duration: 3600 },
+      { videoId: "5qap5aO4i9A", title: "Lofi Hip Hop Radio 24/7 Chill Beats", artist: "ChilledCow", duration: 3600 },
+    ],
+  },
+  "demo-room": {
+    name: "Late Night Lo-Fi Room",
+    hostName: "Maya",
+    avatar: "🎧",
+    videoId: "jfKfPfyJRdk",
+    tracks: [
+      { videoId: "jfKfPfyJRdk", title: "lofi hip hop radio - beats to relax/study to", artist: "Lofi Girl", duration: 3600 },
+      { videoId: "DWcJFNfaw9c", title: "Synthwave Radio - Chill Synth / Retro Beats", artist: "Lofi Records", duration: 3600 },
+    ],
+  },
+  "lofi-cafe-101": {
+    name: "Midnight Coffee & Chillhop",
+    hostName: "Maya",
+    avatar: "🎧",
+    videoId: "jfKfPfyJRdk",
+    tracks: [
+      { videoId: "jfKfPfyJRdk", title: "lofi hip hop radio - beats to relax/study to", artist: "Lofi Girl", duration: 3600 },
+      { videoId: "5qap5aO4i9A", title: "Lofi Hip Hop Radio 24/7 Chill Beats", artist: "ChilledCow", duration: 3600 },
+    ],
+  },
+  "synth-drive-80s": {
+    name: "Retro Synth & Neon Drive",
+    hostName: "Marcus",
+    avatar: "👾",
+    videoId: "DWcJFNfaw9c",
+    tracks: [
+      { videoId: "DWcJFNfaw9c", title: "Synthwave Radio - Chill Synth / Retro Beats", artist: "Lofi Records", duration: 3600 },
+      { videoId: "jfKfPfyJRdk", title: "Nightcall / Neon Beats", artist: "Kavinsky Style", duration: 250 },
+    ],
+  },
+  "deep-focus-code": {
+    name: "Deep Focus for Developers",
+    hostName: "Elena",
+    avatar: "✨",
+    videoId: "5qap5aO4i9A",
+    tracks: [
+      { videoId: "5qap5aO4i9A", title: "Ambient Coding Session Vol. 4", artist: "Deep Coding", duration: 3600 },
+      { videoId: "jfKfPfyJRdk", title: "Chill Programming Vibes", artist: "Lofi Girl", duration: 3600 },
+    ],
+  },
+};
+
 export class RoomService {
   constructor(private repo: IRoomRepository = roomRepository) {}
+
+  private buildDemoRoom(roomId: string): Room {
+    const config = DEMO_ROOM_CONFIGS[roomId] || DEMO_ROOM_CONFIGS["preview-demo"]!;
+    const hostId = `user-${roomId}-host`;
+    const host: Participant = {
+      id: hostId,
+      username: config.hostName,
+      avatar: config.avatar,
+      role: "HOST",
+      connectedAt: Date.now(),
+      isConnected: true,
+    };
+    const queue: QueueItem[] = config.tracks.map((t, idx) => ({
+      id: `queue-${roomId}-${idx + 1}`,
+      videoId: t.videoId,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      thumbnailUrl: `https://img.youtube.com/vi/${t.videoId}/hqdefault.jpg`,
+      addedBy: {
+        participantId: hostId,
+        username: config.hostName,
+        avatar: config.avatar,
+      },
+      addedAt: Date.now() - (config.tracks.length - idx) * 60000,
+    }));
+
+    return {
+      id: roomId,
+      name: config.name,
+      hostId,
+      participants: [host],
+      queue,
+      currentPlaybackState: {
+        videoId: config.videoId,
+        status: "playing",
+        position: 10,
+        updatedAt: Date.now(),
+        revision: 1,
+      },
+      settings: {
+        allowListenerQueue: true,
+        isPrivate: false,
+      },
+      createdAt: Date.now(),
+      status: "active",
+    };
+  }
 
   /**
    * Create a new room with the requesting user as HOST.
@@ -63,9 +174,14 @@ export class RoomService {
    * Find a room by ID.
    */
   async getRoom(roomId: string): Promise<Room> {
-    const room = await this.repo.findById(roomId);
+    let room = await this.repo.findById(roomId);
     if (!room) {
-      throw new AppError(404, `Room "${roomId}" not found.`, "ROOM_NOT_FOUND");
+      if (DEMO_ROOM_CONFIGS[roomId]) {
+        const demo = this.buildDemoRoom(roomId);
+        room = await this.repo.create(demo);
+      } else {
+        throw new AppError(404, `Room "${roomId}" not found.`, "ROOM_NOT_FOUND");
+      }
     }
     return room;
   }
@@ -293,7 +409,15 @@ export class RoomService {
    */
   async listActiveRooms(): Promise<Room[]> {
     const rooms = await this.repo.list();
-    return rooms.filter((r) => r.status !== "closed");
+    const active = rooms.filter((r) => r.status !== "closed");
+    if (active.length === 0) {
+      for (const id of ["lofi-cafe-101", "synth-drive-80s", "deep-focus-code"]) {
+        const demo = this.buildDemoRoom(id);
+        await this.repo.create(demo);
+        active.push(demo);
+      }
+    }
+    return active;
   }
 }
 

@@ -1,0 +1,52 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-build:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build Packages & Apps
+        run: pnpm run build
+
+  deploy:
+    name: Deploy to AWS Lightsail
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Deployment on Remote Host
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            echo "Starting SyncTune continuous deployment..."
+            cd /home/ubuntu/synctune
+            git pull origin main
+            docker compose build
+            docker compose up -d --remove-orphans
+            docker exec synctune-server npx prisma db push --skip-generate
+            echo "SyncTune deployed successfully!"

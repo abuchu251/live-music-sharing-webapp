@@ -50,13 +50,8 @@ export class PlaybackService {
     const current = room.currentPlaybackState;
     const now = Date.now();
 
-    // Stale command rejection
-    if (command.revision < current.revision) {
-      console.warn(
-        `[Playback] Stale command rejected. Received revision ${command.revision}, current is ${current.revision}`
-      );
-      return current;
-    }
+    // Advance revision sequentially so legitimate host commands are never dropped
+    const nextRevision = Math.max(current.revision, command.revision || 0) + 1;
 
     let nextState: PlaybackState;
 
@@ -72,7 +67,7 @@ export class PlaybackService {
           status: "playing",
           position: targetPos,
           updatedAt: now,
-          revision: current.revision + 1,
+          revision: nextRevision,
         };
         break;
       }
@@ -90,7 +85,7 @@ export class PlaybackService {
           status: "paused",
           position: targetPos,
           updatedAt: now,
-          revision: current.revision + 1,
+          revision: nextRevision,
         };
         break;
       }
@@ -103,7 +98,7 @@ export class PlaybackService {
           status: current.status === "idle" ? "paused" : current.status,
           position: targetPos,
           updatedAt: now,
-          revision: current.revision + 1,
+          revision: nextRevision,
         };
         break;
       }
@@ -119,7 +114,7 @@ export class PlaybackService {
           status: "playing",
           position: Math.max(0, command.payload?.position ?? 0),
           updatedAt: now,
-          revision: current.revision + 1,
+          revision: nextRevision,
         };
         break;
       }
@@ -132,7 +127,7 @@ export class PlaybackService {
           status: "playing",
           position: 0,
           updatedAt: now,
-          revision: current.revision + 1,
+          revision: nextRevision,
         };
         break;
       }

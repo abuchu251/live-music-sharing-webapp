@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   Radio,
   Play,
@@ -22,6 +22,7 @@ import { JoinRoomModal } from "../features/room/JoinRoomModal";
 import { MOCK_PUBLIC_ROOMS } from "../features/room/mockData";
 
 export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
@@ -313,7 +314,7 @@ export const LandingPage: React.FC = () => {
                   variant="interactive"
                   className="p-5 space-y-4 border-zinc-800/80 bg-zinc-900/50"
                   onClick={() => {
-                    window.location.href = `/room/${room.id}`;
+                    navigate(`/room/${room.id}`);
                   }}
                 >
                   <div className="flex items-start justify-between">
