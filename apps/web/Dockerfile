@@ -8,13 +8,17 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy root configurations & source files
+# Copy root configurations & package definitions first for Docker layer caching
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY apps/web/package.json ./apps/web/
+
+# Install dependencies (cached unless package.json/pnpm-lock changes)
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
 COPY packages/shared-types ./packages/shared-types
 COPY apps/web ./apps/web
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
 
 # Build shared types
 RUN pnpm --filter @synctune/shared-types build

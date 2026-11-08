@@ -9,13 +9,17 @@ WORKDIR /app
 # Enable Corepack & pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy root workspace configurations
+# Copy root workspace configurations & package definitions first for Docker layer caching
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY server/package.json ./server/
+
+# Install all workspace dependencies (cached unless package.json/pnpm-lock changes)
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
 COPY packages/shared-types ./packages/shared-types
 COPY server ./server
-
-# Install all workspace dependencies
-RUN pnpm install --frozen-lockfile
 
 # Generate Prisma Client
 RUN pnpm --filter @synctune/server exec prisma generate
