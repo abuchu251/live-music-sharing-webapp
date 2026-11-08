@@ -127,13 +127,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
           )}
 
           <a
-            href="https://github.com/abuchu251/live-music-sharing-webapp"
+            href="https://github.com/abuchu251/live-music-sharing-webapp/issues/new?title=%5BContributor+Request%5D+I%27d+like+to+contribute+to+SyncTune&body=Hi+%40abuchu251%2C%0A%0AI+would+love+to+contribute+to+SyncTune%21%0A%0A%2A%2AWhat+I+would+like+to+help+with%3A%2A%2A+%0A%2A%2AMy+skills%2Fexperience%3A%2A%2A+%0A%2A%2AContact%2FDiscord%3A%2A%2A+"
             target="_blank"
             rel="noreferrer"
-            className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/60 transition-colors"
-            aria-label="GitHub Repository"
+            className="p-2 text-zinc-400 hover:text-purple-300 rounded-lg hover:bg-zinc-800/60 transition-colors flex items-center gap-1.5 text-xs font-medium"
+            title="Request to be a Contributor on GitHub"
+            aria-label="Request to be a Contributor on GitHub"
           >
-            <Code2 className="w-4 h-4" />
+            <Code2 className="w-4 h-4 text-purple-400" />
+            <span className="hidden sm:inline text-xs text-zinc-300 hover:text-white">Contribute</span>
           </a>
         </div>
       </div>

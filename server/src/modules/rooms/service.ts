@@ -244,7 +244,7 @@ export class RoomService {
     roomId: string,
     participantId: string,
     isConnected: boolean
-  ): Promise<{ room: Room; participant: Participant; statusChanged: boolean } | null> {
+  ): Promise<{ room: Room; participant: Participant; promotedHost?: Participant | null; statusChanged: boolean } | null> {
     const room = await this.repo.findById(roomId);
     if (!room) return null;
 
@@ -253,18 +253,36 @@ export class RoomService {
 
     participant.isConnected = isConnected;
     let statusChanged = false;
+    let promotedHost: Participant | null = null;
 
-    // Host disconnect handling: Mark room as host-disconnected without silently transferring host
-    if (participant.role === "HOST") {
-      const newStatus: RoomStatus = isConnected ? "active" : "host-disconnected";
-      if (room.status !== newStatus) {
-        room.status = newStatus;
+    // Automatic Host Promotion: When host disconnects, promote the next connected participant
+    if (participant.role === "HOST" && !isConnected) {
+      const nextActive = room.participants.find(
+        (p) => p.id !== participantId && p.isConnected
+      );
+      if (nextActive) {
+        participant.role = "LISTENER";
+        nextActive.role = "HOST";
+        room.hostId = nextActive.id;
+        room.status = "active";
+        promotedHost = nextActive;
+        statusChanged = true;
+      } else {
+        const newStatus: RoomStatus = "host-disconnected";
+        if (room.status !== newStatus) {
+          room.status = newStatus;
+          statusChanged = true;
+        }
+      }
+    } else if (participant.role === "HOST" && isConnected) {
+      if (room.status !== "active") {
+        room.status = "active";
         statusChanged = true;
       }
     }
 
     const updated = await this.repo.update(room);
-    return { room: updated, participant, statusChanged };
+    return { room: updated, participant, promotedHost, statusChanged };
   }
 
   /**
@@ -273,7 +291,7 @@ export class RoomService {
   async leaveRoom(
     roomId: string,
     participantId: string
-  ): Promise<{ room: Room; participant: Participant } | null> {
+  ): Promise<{ room: Room; participant: Participant; promotedHost?: Participant | null } | null> {
     const room = await this.repo.findById(roomId);
     if (!room) return null;
 
@@ -283,17 +301,23 @@ export class RoomService {
     const [removed] = room.participants.splice(index, 1);
     if (!removed) return null;
 
-    // If host left and no participants remain, close room
+    let promotedHost: Participant | null = null;
+
+    // If host left, promote the next connected listener
     if (removed.role === "HOST") {
-      if (room.participants.length === 0) {
-        room.status = "closed";
+      const nextActive = room.participants.find((p) => p.isConnected);
+      if (nextActive) {
+        nextActive.role = "HOST";
+        room.hostId = nextActive.id;
+        room.status = "active";
+        promotedHost = nextActive;
       } else {
-        room.status = "host-disconnected";
+        room.status = room.participants.length === 0 ? "closed" : "host-disconnected";
       }
     }
 
     const updated = await this.repo.update(room);
-    return { room: updated, participant: removed };
+    return { room: updated, participant: removed, promotedHost };
   }
 
   /**

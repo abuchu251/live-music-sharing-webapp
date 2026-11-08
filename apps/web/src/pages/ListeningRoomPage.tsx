@@ -11,6 +11,7 @@ import {
   Check,
   AlertTriangle,
   Loader2,
+  MessageSquare,
 } from "lucide-react";
 import { RoomPlayer } from "../components/player/RoomPlayer";
 import { RoomSidebar } from "../features/room/RoomSidebar";
@@ -35,9 +36,15 @@ export const ListeningRoomPage: React.FC = () => {
     participantId?: string;
   };
 
-  const storedParticipantId = sessionStorage.getItem(`synctune:participantId:${roomId}`);
-  const storedUsername = sessionStorage.getItem(`synctune:username:${roomId}`);
-  const storedAvatar = sessionStorage.getItem(`synctune:avatar:${roomId}`);
+  const storedParticipantId =
+    localStorage.getItem(`synctune:participantId:${roomId}`) ||
+    sessionStorage.getItem(`synctune:participantId:${roomId}`);
+  const storedUsername =
+    localStorage.getItem(`synctune:username:${roomId}`) ||
+    sessionStorage.getItem(`synctune:username:${roomId}`);
+  const storedAvatar =
+    localStorage.getItem(`synctune:avatar:${roomId}`) ||
+    sessionStorage.getItem(`synctune:avatar:${roomId}`);
 
   const [username] = useState(
     locationState.username || storedUsername || `User-${Math.floor(Math.random() * 900 + 100)}`
@@ -54,6 +61,10 @@ export const ListeningRoomPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [chatToast, setChatToast] = useState<ChatMessage | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<"queue" | "participants" | "chat">("queue");
+  const [replyPrefill, setReplyPrefill] = useState<string>("");
 
   // Playback & Queue state (integrated with UI)
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -111,7 +122,12 @@ export const ListeningRoomPage: React.FC = () => {
               if (res.room.currentPlaybackState?.revision) {
                 playbackRevisionRef.current = res.room.currentPlaybackState.revision;
               }
+              localStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
+              localStorage.setItem(`synctune:username:${roomId}`, username);
+              sessionStorage.setItem(`synctune:username:${roomId}`, username);
+              localStorage.setItem(`synctune:avatar:${roomId}`, avatar);
+              sessionStorage.setItem(`synctune:avatar:${roomId}`, avatar);
               setIsConnected(true);
               setIsLoading(false);
             } else {
@@ -127,10 +143,13 @@ export const ListeningRoomPage: React.FC = () => {
           setQueue(updatedQueue);
         });
 
-        // Listen for new chat messages
+        // Listen for new chat messages & trigger notification toast
         socket.on("chat:message", (newMsg) => {
           if (!isMounted) return;
           setChatMessages((prev) => [...prev, newMsg]);
+          if (newMsg.senderUsername !== username) {
+            setChatToast(newMsg);
+          }
         });
 
         // Listen for new participants
@@ -151,12 +170,15 @@ export const ListeningRoomPage: React.FC = () => {
           setParticipants((prev) => prev.filter((p) => p.id !== leftId));
         });
 
-        // Listen for participant connection updates (disconnect/reconnect)
+        // Listen for participant connection updates (disconnect/reconnect, host promotion)
         socket.on("room:participant-updated", (updatedParticipant) => {
           if (!isMounted) return;
           setParticipants((prev) =>
             prev.map((p) => (p.id === updatedParticipant.id ? updatedParticipant : p))
           );
+          if (updatedParticipant.role === "HOST") {
+            setRoom((prev) => (prev ? { ...prev, hostId: updatedParticipant.id } : prev));
+          }
         });
 
         // Listen for room status changes (e.g. Host disconnected)
@@ -288,6 +310,19 @@ export const ListeningRoomPage: React.FC = () => {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const handleCopyRoomCode = () => {
+    navigator.clipboard.writeText(room?.id || roomId);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  // Auto-dismiss chat toast notification
+  useEffect(() => {
+    if (!chatToast) return;
+    const timer = setTimeout(() => setChatToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [chatToast]);
+
   // Convert Participant[] to format expected by RoomSidebar
   const sidebarParticipants: MockParticipant[] = participants.map((p) => ({
     id: p.id,
@@ -359,7 +394,21 @@ export const ListeningRoomPage: React.FC = () => {
                   <span>{room.name}</span>
                 </h1>
                 <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                  <span className="font-mono">ID: {room.id}</span>
+                  <button
+                    onClick={handleCopyRoomCode}
+                    className="font-mono hover:text-white flex items-center gap-1 bg-zinc-900 hover:bg-zinc-800 px-2 py-0.5 rounded-md border border-zinc-800 cursor-pointer transition-colors"
+                    title="Click to copy Room Code"
+                  >
+                    {copiedCode ? (
+                      <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                        <Check className="w-2.5 h-2.5" /> Copied Code!
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-zinc-300">
+                        ID: {room.id} <Copy className="w-2.5 h-2.5 text-zinc-400" />
+                      </span>
+                    )}
+                  </button>
                   <span>•</span>
                   <span
                     className={`flex items-center gap-1 ${
@@ -375,7 +424,7 @@ export const ListeningRoomPage: React.FC = () => {
 
           {/* Right: Actions & User Info */}
           <div className="flex items-center gap-2.5">
-            {/* Quick Share Button */}
+            {/* Quick Share Link Button */}
             <Button
               variant="outline"
               size="sm"
@@ -388,7 +437,7 @@ export const ListeningRoomPage: React.FC = () => {
               }
               onClick={handleCopyInvite}
             >
-              {copiedLink ? "Copied" : "Invite"}
+              {copiedLink ? "Link Copied!" : "Copy Link"}
             </Button>
 
             {/* Current User Badge */}
@@ -491,10 +540,51 @@ export const ListeningRoomPage: React.FC = () => {
               onRemoveSong={handleRemoveSong}
               onSendMessage={handleSendMessage}
               onPlaySong={handlePlayQueuedSong}
+              activeTab={sidebarTab}
+              onTabChange={setSidebarTab}
+              replyPrefill={replyPrefill}
+              onClearReplyPrefill={() => setReplyPrefill("")}
             />
           </aside>
         </div>
       </main>
+
+      {/* Floating Chat Notification Toast with Reply */}
+      {chatToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl bg-zinc-900/95 border border-purple-500/40 p-3.5 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300 flex items-start gap-3">
+          <div className="text-2xl shrink-0">{chatToast.senderAvatar || "💬"}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-white truncate">
+                {chatToast.senderUsername}
+              </span>
+              <button
+                onClick={() => setChatToast(null)}
+                className="text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-zinc-300 truncate mt-0.5">
+              {chatToast.content.replace(/<[^>]*>?/gm, "")}
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setReplyPrefill(`@${chatToast.senderUsername} `);
+                  setSidebarTab("chat");
+                  setChatToast(null);
+                }}
+                className="px-2.5 py-1 text-[11px] font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
+              >
+                <MessageSquare className="w-3 h-3" />
+                Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

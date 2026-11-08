@@ -21,6 +21,7 @@ export function usePlaybackSync({
   const [playbackState, setPlaybackState] = useState<PlaybackState>(initialState);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("in-sync");
   const [currentDrift, setCurrentDrift] = useState<number>(0);
+  const [isLocallyPaused, setIsLocallyPaused] = useState<boolean>(false);
 
   // Clock offset in ms between client and server (serverTime = Date.now() + clockOffset)
   const clockOffsetRef = useRef<number>(0);
@@ -81,6 +82,13 @@ export function usePlaybackSync({
         }
 
         if (targetState.status === "playing") {
+          // If listener is locally paused, respect their local pause
+          if (!isHost && isLocallyPaused) {
+            player.pause();
+            setSyncStatus("paused");
+            return;
+          }
+
           // If paused locally, start playing
           const playerState = player.getPlayerState();
           if (playerState !== 1) { // 1 = PLAYING
@@ -97,6 +105,7 @@ export function usePlaybackSync({
         } else if (targetState.status === "paused") {
           player.pause();
           setSyncStatus("paused");
+          setIsLocallyPaused(false);
           if (drift > 0.5) {
             player.seekTo(targetState.position);
           }
@@ -147,6 +156,7 @@ export function usePlaybackSync({
     const driftCheckInterval = setInterval(() => {
       if (isProgrammaticUpdateRef.current) return;
       if (playbackState.status !== "playing") return;
+      if (!isHost && isLocallyPaused) return;
 
       const player = playerRef.current;
       if (!player) return;
@@ -221,11 +231,47 @@ export function usePlaybackSync({
     [isHost]
   );
 
+  const toggleLocalPlayback = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (isLocallyPaused) {
+      // Resume and immediately resync with authoritative room playback
+      setIsLocallyPaused(false);
+      const expectedPos = calculateExpectedPosition(playbackState);
+      player.seekTo(expectedPos);
+      if (playbackState.status === "playing") {
+        player.play();
+        setSyncStatus("in-sync");
+      }
+    } else {
+      // Pause locally for this listener only
+      setIsLocallyPaused(true);
+      player.pause();
+      setSyncStatus("paused");
+    }
+  }, [isLocallyPaused, calculateExpectedPosition, playbackState, playerRef]);
+
+  const resyncToLive = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    setIsLocallyPaused(false);
+    const expectedPos = calculateExpectedPosition(playbackState);
+    player.seekTo(expectedPos);
+    if (playbackState.status === "playing") {
+      player.play();
+      setSyncStatus("in-sync");
+    }
+  }, [calculateExpectedPosition, playbackState, playerRef]);
+
   return {
     playbackState,
     syncStatus,
     currentDrift,
+    isLocallyPaused,
     isProgrammaticUpdate: isProgrammaticUpdateRef.current,
+    toggleLocalPlayback,
+    resyncToLive,
     sendPlay: (position?: number) => sendHostCommand("play", { position }),
     sendPause: (position?: number) => sendHostCommand("pause", { position }),
     sendSeek: (position: number) => sendHostCommand("seek", { position }),

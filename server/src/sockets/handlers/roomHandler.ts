@@ -75,7 +75,10 @@ export function registerRoomHandlers(socket: TypedSocket): void {
 
       if (result) {
         socket.to(roomId).emit("room:participant-left", { participantId });
-        if (result.room.status === "host-disconnected") {
+        if (result.promotedHost) {
+          socket.to(roomId).emit("room:participant-updated", result.promotedHost);
+          socket.to(roomId).emit("room:status-changed", { status: "active" });
+        } else if (result.room.status === "host-disconnected") {
           socket.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
         }
       }
@@ -109,8 +112,11 @@ export function registerRoomHandlers(socket: TypedSocket): void {
         // Broadcast participant connection update
         socket.to(roomId).emit("room:participant-updated", result.participant);
 
-        // If host disconnected, notify remaining listeners
-        if (result.statusChanged && result.room.status === "host-disconnected") {
+        // If a new participant was promoted to HOST, notify everyone
+        if (result.promotedHost) {
+          socket.to(roomId).emit("room:participant-updated", result.promotedHost);
+          socket.to(roomId).emit("room:status-changed", { status: "active" });
+        } else if (result.statusChanged && result.room.status === "host-disconnected") {
           socket.to(roomId).emit("room:status-changed", { status: "host-disconnected" });
         }
       }

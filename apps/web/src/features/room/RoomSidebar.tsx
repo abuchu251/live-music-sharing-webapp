@@ -29,6 +29,10 @@ export interface RoomSidebarProps {
   onRemoveSong: (songId: string) => void;
   onSendMessage: (content: string) => void;
   onPlaySong?: (song: QueueItem, index: number) => void;
+  activeTab?: "queue" | "participants" | "chat";
+  onTabChange?: (tab: "queue" | "participants" | "chat") => void;
+  replyPrefill?: string;
+  onClearReplyPrefill?: () => void;
 }
 
 export const RoomSidebar: React.FC<RoomSidebarProps> = ({
@@ -43,18 +47,43 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onRemoveSong,
   onSendMessage,
   onPlaySong,
+  activeTab: activeTabProp,
+  onTabChange,
+  replyPrefill,
+  onClearReplyPrefill,
 }) => {
-  const [activeTab, setActiveTab] = useState<"queue" | "participants" | "chat">("queue");
-  const [copied, setCopied] = useState(false);
+  const [internalTab, setInternalTab] = useState<"queue" | "participants" | "chat">("queue");
+  const activeTab = activeTabProp || internalTab;
+  const setActiveTab = (tab: "queue" | "participants" | "chat") => {
+    setInternalTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
+
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [newSongInput, setNewSongInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
 
+  React.useEffect(() => {
+    if (replyPrefill) {
+      setChatInput(replyPrefill);
+      if (onClearReplyPrefill) onClearReplyPrefill();
+    }
+  }, [replyPrefill, onClearReplyPrefill]);
+
+  const handleCopyRoomCode = () => {
+    navigator.clipboard.writeText(roomId).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    });
+  };
+
   const handleCopyLink = () => {
-    const inviteUrl = `${window.location.origin}/room/${roomId}`;
-    navigator.clipboard.writeText(inviteUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    const url = typeof window !== "undefined" ? `${window.location.origin}/room/${roomId}` : roomId;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     });
   };
 
@@ -84,34 +113,33 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
       {/* Room Header Info */}
       <div className="p-4 border-b border-zinc-800 space-y-3 bg-zinc-950/40">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-0.5 min-w-0">
+          <div className="space-y-0.5 min-w-0 flex-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
               Listening Room
             </span>
             <h3 className="text-base font-bold text-white truncate">
               {roomName}
             </h3>
-            <p className="text-xs text-zinc-400 font-mono">ID: {roomId}</p>
           </div>
 
           <button
-            onClick={handleCopyLink}
-            className={`p-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer ${
-              copied
-                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                : "bg-zinc-800 hover:bg-zinc-700/80 border-zinc-700 text-zinc-300 hover:text-white"
+            onClick={handleCopyRoomCode}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-mono border flex items-center gap-1.5 transition-all cursor-pointer ${
+              copiedCode
+                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-semibold"
+                : "bg-zinc-800/80 hover:bg-zinc-700 border-zinc-700/80 text-zinc-300 hover:text-white"
             }`}
-            title="Copy invitation link"
+            title="Click to copy Room Code"
           >
-            {copied ? (
+            {copiedCode ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Copied!</span>
+                <Check className="w-3 h-3 text-emerald-400" />
+                <span>Copied Code!</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Share</span>
+                <Copy className="w-3 h-3 text-zinc-400" />
+                <span className="max-w-[120px] truncate">ID: {roomId}</span>
               </>
             )}
           </button>
@@ -233,9 +261,9 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                   </div>
                 </div>
 
-                {isHost && (
+                {(isHost || song.addedBy?.username === currentUser.username) && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {onPlaySong && (
+                    {isHost && onPlaySong && (
                       <button
                         onClick={() => onPlaySong(song, index)}
                         className="p-1.5 text-zinc-400 hover:text-emerald-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
@@ -338,7 +366,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
               onClick={handleCopyLink}
               className="w-full py-1.5 text-xs font-medium rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 cursor-pointer"
             >
-              {copied ? "Link Copied!" : "Copy Room Link"}
+              {copiedLink ? "Link Copied!" : "Copy Room Link"}
             </button>
           </div>
         </div>

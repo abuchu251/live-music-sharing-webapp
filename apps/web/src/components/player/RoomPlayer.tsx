@@ -57,6 +57,9 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
     playbackState,
     syncStatus,
     currentDrift,
+    isLocallyPaused,
+    toggleLocalPlayback,
+    resyncToLive,
     sendPlay,
     sendPause,
     sendSeek,
@@ -72,7 +75,8 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
     },
   });
 
-  const isPlaying = playbackState.status === "playing";
+  const isRoomPlaying = playbackState.status === "playing";
+  const isEffectivelyPlaying = isHost ? isRoomPlaying : (isRoomPlaying && !isLocallyPaused);
   const activeVideoId = playbackState.videoId || currentSong?.videoId || "jfKfPfyJRdk";
 
   const formatTime = (seconds: number) => {
@@ -83,11 +87,14 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   };
 
   const handleTogglePlay = () => {
-    if (!isHost) return;
-    if (isPlaying) {
-      sendPause(currentTime);
+    if (isHost) {
+      if (isRoomPlaying) {
+        sendPause(currentTime);
+      } else {
+        sendPlay(currentTime);
+      }
     } else {
-      sendPlay(currentTime);
+      toggleLocalPlayback();
     }
   };
 
@@ -171,7 +178,9 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
           <div className="flex items-center gap-2">
             <Badge
               variant={
-                syncStatus === "in-sync"
+                isLocallyPaused
+                  ? "purple"
+                  : syncStatus === "in-sync"
                   ? "emerald"
                   : syncStatus === "correcting"
                   ? "amber"
@@ -180,8 +189,10 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
               size="sm"
               dot
             >
-              {syncStatus === "in-sync"
-                ? isPlaying
+              {isLocallyPaused
+                ? "Locally Paused"
+                : syncStatus === "in-sync"
+                ? isEffectivelyPlaying
                   ? "Synchronized (Playing)"
                   : "Synchronized (Paused)"
                 : syncStatus === "correcting"
@@ -346,17 +357,18 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             {/* Main Play/Pause Button */}
             <button
               onClick={handleTogglePlay}
-              disabled={!isHost}
-              title={isHost ? (isPlaying ? "Pause for All" : "Play for All") : "Host controls playback"}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all transform active:scale-95 ${
-                !isHost
-                  ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700"
-                  : isPlaying
-                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/40 cursor-pointer border border-purple-400/40"
-                  : "bg-white text-zinc-950 hover:bg-zinc-200 shadow-lg shadow-white/20 cursor-pointer"
+              title={
+                isHost
+                  ? (isRoomPlaying ? "Pause for All" : "Play for All")
+                  : (isLocallyPaused ? "Resume & Flow with Room" : "Pause My Audio")
+              }
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all transform active:scale-95 cursor-pointer ${
+                isEffectivelyPlaying
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/40 border border-purple-400/40"
+                  : "bg-white text-zinc-950 hover:bg-zinc-200 shadow-lg shadow-white/20"
               }`}
             >
-              {isPlaying ? (
+              {isEffectivelyPlaying ? (
                 <Pause className="w-5 h-5 fill-current" />
               ) : (
                 <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -388,16 +400,26 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
           {/* Right: Authoritative Sync Pill */}
           <div className="flex items-center justify-end gap-2 w-32 md:w-44 text-xs font-mono text-zinc-400">
-            <span className="capitalize">{isPlaying ? "Streaming" : "Paused"}</span>
+            <span className="capitalize">{isEffectivelyPlaying ? "Streaming" : "Paused"}</span>
           </div>
         </div>
 
         {/* Non-host information banner */}
         {!isHost && (
-          <div className="text-center pt-1">
-            <span className="text-[11px] text-zinc-500 italic">
-              Synchronized listening mode: Playback follows the host in real time.
+          <div className="flex items-center justify-center gap-2 pt-1 text-center">
+            <span className="text-[11px] text-zinc-400">
+              {isLocallyPaused
+                ? "You paused playback locally."
+                : "Synchronized listening: Follows room in real time."}
             </span>
+            {isLocallyPaused && (
+              <button
+                onClick={resyncToLive}
+                className="text-[11px] text-purple-400 hover:text-purple-300 underline font-medium cursor-pointer"
+              >
+                Sync with Room Live →
+              </button>
+            )}
           </div>
         )}
       </div>
