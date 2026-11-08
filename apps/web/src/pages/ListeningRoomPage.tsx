@@ -217,7 +217,7 @@ export const ListeningRoomPage: React.FC = () => {
         if (!res.ok) console.error("Failed to change video:", res.error);
       });
     }
-    const foundIdx = queue.findIndex((q) => q.videoId === videoId);
+    const foundIdx = queue.findIndex((q: QueueItem) => q.videoId === videoId);
     if (foundIdx !== -1) {
       setCurrentSongIndex(foundIdx);
     }

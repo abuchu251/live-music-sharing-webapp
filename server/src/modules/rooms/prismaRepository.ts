@@ -16,7 +16,7 @@ export class PrismaRoomRepository implements IRoomRepository {
 
     if (!record) return null;
 
-    const participants: Participant[] = record.participants.map((p) => ({
+    const participants: Participant[] = record.participants.map((p: any) => ({
       id: p.id,
       username: p.username,
       avatar: p.avatar,
@@ -25,7 +25,7 @@ export class PrismaRoomRepository implements IRoomRepository {
       isConnected: p.isConnected,
     }));
 
-    const queue: QueueItem[] = record.queueItems.map((q) => ({
+    const queue: QueueItem[] = record.queueItems.map((q: any) => ({
       id: q.id,
       videoId: q.videoId,
       title: q.title,
@@ -85,7 +85,7 @@ export class PrismaRoomRepository implements IRoomRepository {
     // Create initial participants if any
     if (room.participants.length > 0) {
       await prisma.roomParticipant.createMany({
-        data: room.participants.map((p) => ({
+        data: room.participants.map((p: any) => ({
           id: p.id,
           roomId: room.id,
           username: p.username,
@@ -196,11 +196,11 @@ export class PrismaRoomRepository implements IRoomRepository {
       },
     });
 
-    return rooms.map((record) => ({
+    return rooms.map((record: any) => ({
       id: record.id,
       name: record.name,
       hostId: record.hostId,
-      participants: record.participants.map((p) => ({
+      participants: record.participants.map((p: any) => ({
         id: p.id,
         username: p.username,
         avatar: p.avatar,
@@ -215,7 +215,7 @@ export class PrismaRoomRepository implements IRoomRepository {
         updatedAt: Number(record.playbackUpdatedAt),
         revision: record.playbackRevision,
       },
-      queue: record.queueItems.map((q) => ({
+      queue: record.queueItems.map((q: any) => ({
         id: q.id,
         videoId: q.videoId,
         title: q.title,
