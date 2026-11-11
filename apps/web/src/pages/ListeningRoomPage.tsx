@@ -465,6 +465,20 @@ export const ListeningRoomPage: React.FC = () => {
     });
   };
 
+  const handleReorderQueue = (newQueue: QueueItem[]) => {
+    setQueue(newQueue);
+    const socket = getSocket();
+    socket.emit(
+      "queue:reorder",
+      { queueItemIds: newQueue.map((item) => item.id) },
+      (res) => {
+        if (!res.ok) {
+          console.error("Failed to reorder queue on server:", res.error);
+        }
+      }
+    );
+  };
+
   const handleSendMessage = (content: string) => {
     const socket = getSocket();
     socket.emit("chat:send", { content }, (res) => {
@@ -832,6 +846,7 @@ export const ListeningRoomPage: React.FC = () => {
               chatMessages={chatMessages}
               onAddSong={handleAddSong}
               onRemoveSong={handleRemoveSong}
+              onReorderQueue={handleReorderQueue}
               onSendMessage={handleSendMessage}
               onPlaySong={handlePlayQueuedSong}
               activeTab={sidebarTab}

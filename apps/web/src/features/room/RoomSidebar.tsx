@@ -11,6 +11,7 @@ import {
   Crown,
   Share2,
   Play,
+  GripVertical,
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -30,6 +31,7 @@ export interface RoomSidebarProps {
   onRemoveSong: (songId: string) => void;
   onSendMessage: (content: string) => void;
   onPlaySong?: (song: QueueItem, index: number) => void;
+  onReorderQueue?: (newQueue: QueueItem[]) => void;
   activeTab?: "queue" | "participants" | "chat";
   onTabChange?: (tab: "queue" | "participants" | "chat") => void;
   replyPrefill?: string;
@@ -48,6 +50,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onRemoveSong,
   onSendMessage,
   onPlaySong,
+  onReorderQueue,
   activeTab: activeTabProp,
   onTabChange,
   replyPrefill,
@@ -62,6 +65,48 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...queue];
+    const [movedItem] = reordered.splice(draggedIndex, 1);
+    if (movedItem) {
+      reordered.splice(targetIndex, 0, movedItem);
+      if (onReorderQueue) {
+        onReorderQueue(reordered);
+      }
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
   const [newSongInput, setNewSongInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -250,9 +295,30 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
             {queue.map((song, index) => (
               <div
                 key={song.id}
-                className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-zinc-950/60 hover:bg-zinc-800/60 border border-zinc-800/80 hover:border-zinc-700 transition-all"
+                draggable={isHost}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`group relative flex items-center gap-2.5 p-2.5 rounded-2xl border transition-all ${
+                  draggedIndex === index
+                    ? "opacity-40 scale-[0.98] border-purple-500 bg-purple-500/10"
+                    : dragOverIndex === index
+                    ? "border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/20"
+                    : "bg-zinc-950/60 hover:bg-zinc-800/60 border-zinc-800/80 hover:border-zinc-700"
+                }`}
               >
-                <span className="w-5 text-center text-xs font-mono text-zinc-500">
+                {/* Drag handle to the left of the numbering */}
+                <div
+                  className={`p-1 -ml-1 text-zinc-600 group-hover:text-zinc-300 transition-colors ${
+                    isHost ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-40"
+                  }`}
+                  title={isHost ? "Drag to reorder track in queue" : "Only host can reorder queue"}
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </div>
+
+                <span className="w-5 text-center text-xs font-mono text-zinc-400 font-semibold select-none">
                   {index + 1}
                 </span>
 
