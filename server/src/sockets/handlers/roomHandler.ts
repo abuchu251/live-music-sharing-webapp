@@ -102,6 +102,36 @@ export function registerRoomHandlers(
     }
   });
 
+  // Host permanently closes/deletes the room
+  socket.on("room:close", async (callback) => {
+    const { roomId, participantId } = socket.data;
+    if (!roomId || !participantId) {
+      callback({ ok: false, error: "You must join a room first." });
+      return;
+    }
+
+    try {
+      await roomService.closeRoom(roomId, participantId);
+
+      // Broadcast room:closed event to ALL participants in the room
+      io.to(roomId).emit("room:closed", { reason: "The host has closed and deleted this room." });
+
+      // Disconnect all sockets from this socket.io room
+      const roomSockets = await io.in(roomId).fetchSockets();
+      for (const s of roomSockets) {
+        s.leave(roomId);
+        s.data.roomId = undefined as unknown as string;
+      }
+
+      console.log(`[Socket] Host ${participantId} closed and deleted room ${roomId}`);
+      callback({ ok: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to close room.";
+      console.error(`[Socket] room:close error:`, msg);
+      callback({ ok: false, error: msg });
+    }
+  });
+
   // Socket disconnected (tab closed, network dropped)
   socket.on("disconnect", async (reason) => {
     const { roomId, participantId, username } = socket.data;

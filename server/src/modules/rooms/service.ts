@@ -321,6 +321,22 @@ export class RoomService {
   }
 
   /**
+   * Close/delete a room permanently (Host only).
+   */
+  async closeRoom(roomId: string, participantId: string): Promise<Room> {
+    const room = await this.getRoom(roomId);
+    if (room.hostId !== participantId) {
+      throw new AppError(403, "Only the room host can delete or close this room.", "FORBIDDEN");
+    }
+
+    room.status = "closed";
+    room.participants = [];
+    room.queue = [];
+    const updated = await this.repo.update(room);
+    return updated;
+  }
+
+  /**
    * Add a YouTube video track to the room queue.
    */
   async addQueueItem(params: {

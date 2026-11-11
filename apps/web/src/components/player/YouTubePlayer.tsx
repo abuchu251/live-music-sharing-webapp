@@ -42,7 +42,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     {
       videoId,
       autoplay = false,
-      controls = true,
+      controls = false,
       startSeconds = 0,
       onReady,
       onStateChange,

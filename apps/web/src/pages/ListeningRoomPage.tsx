@@ -12,7 +12,10 @@ import {
   AlertTriangle,
   Loader2,
   MessageSquare,
+  Trash2,
+  LogOut,
 } from "lucide-react";
+import { copyToClipboard } from "../utils/clipboard";
 import { RoomPlayer } from "../components/player/RoomPlayer";
 import { RoomSidebar } from "../features/room/RoomSidebar";
 import { Badge } from "../components/ui/Badge";
@@ -80,6 +83,16 @@ export const ListeningRoomPage: React.FC = () => {
   const [isPlaylistFinished, setIsPlaylistFinished] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<"queue" | "participants" | "chat">("queue");
   const [replyPrefill, setReplyPrefill] = useState<string>("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Request browser notification permission for out-of-chrome chat alerts
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+  }, []);
 
   // Playback & Queue state (integrated with UI)
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -193,16 +206,47 @@ export const ListeningRoomPage: React.FC = () => {
           setQueue(updatedQueue);
         });
 
-        // Listen for new chat messages & trigger notification toast
+        // Listen for new chat messages & trigger notification toast and native desktop alert
         socket.on("chat:message", (newMsg) => {
           if (!isMounted) return;
           setChatMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
+
           if (newMsg.senderUsername !== username) {
             setChatToast(newMsg);
+
+            // Native out-of-browser notification when minimized or in another tab/app
+            if (
+              typeof window !== "undefined" &&
+              "Notification" in window &&
+              Notification.permission === "granted" &&
+              document.hidden
+            ) {
+              try {
+                const plainContent = newMsg.content.replace(/<[^>]*>?/gm, "");
+                const notif = new Notification(`${newMsg.senderUsername} • SyncTune`, {
+                  body: plainContent,
+                  tag: `synctune-msg-${newMsg.id}`,
+                });
+                notif.onclick = () => {
+                  window.focus();
+                  notif.close();
+                };
+              } catch {
+                // Ignore notification constructor errors
+              }
+            }
           }
+        });
+
+        // Listen for room being closed/deleted by the host
+        socket.on("room:closed", (data) => {
+          if (!isMounted) return;
+          sessionStorage.removeItem("synctune:active_room");
+          alert(data?.reason || "This room has been closed by the host.");
+          navigate("/");
         });
 
         // Listen for new participants
@@ -284,11 +328,11 @@ export const ListeningRoomPage: React.FC = () => {
     return () => {
       isMounted = false;
       const socket = getSocket();
-      socket.emit("room:leave");
       socket.off("room:participant-joined");
       socket.off("room:participant-left");
       socket.off("room:participant-updated");
       socket.off("room:status-changed");
+      socket.off("room:closed");
       socket.off("queue:updated");
       socket.off("chat:message");
       socket.off("playback:state-update");
@@ -365,10 +409,42 @@ export const ListeningRoomPage: React.FC = () => {
     handleChangeVideo(song.videoId, song.title);
   }, [isHost, handleChangeVideo]);
 
-  const handleLeaveRoom = () => {
+  const handleBackToHome = () => {
+    // Keep user in the room session - do NOT emit room:leave
+    if (room && roomId) {
+      sessionStorage.setItem(
+        "synctune:active_room",
+        JSON.stringify({
+          roomId,
+          roomName: room.name,
+          isHost,
+          currentSongTitle: currentSong?.title || "Live Stream",
+          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
+          participantId,
+        })
+      );
+    }
+    navigate("/");
+  };
+
+  const handleExplicitLeave = () => {
+    sessionStorage.removeItem("synctune:active_room");
     const socket = getSocket();
     socket.emit("room:leave");
     navigate("/");
+  };
+
+  const handleConfirmDeleteRoom = () => {
+    const socket = getSocket();
+    socket.emit("room:close", (res) => {
+      if (res.ok) {
+        sessionStorage.removeItem("synctune:active_room");
+        setShowDeleteModal(false);
+        navigate("/");
+      } else {
+        alert(res.error || "Failed to delete room.");
+      }
+    });
   };
 
   const handleAddSong = (title: string, videoId: string) => {
@@ -399,15 +475,21 @@ export const ListeningRoomPage: React.FC = () => {
   };
 
   const handleCopyInvite = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    copyToClipboard(window.location.href).then((ok) => {
+      if (ok) {
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      }
+    });
   };
 
   const handleCopyRoomCode = () => {
-    navigator.clipboard.writeText(room?.id || roomId);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
+    copyToClipboard(room?.id || roomId).then((ok) => {
+      if (ok) {
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      }
+    });
   };
 
   // Auto-dismiss chat toast notification
@@ -546,9 +628,9 @@ export const ListeningRoomPage: React.FC = () => {
           {/* Left: Brand & Room Name */}
           <div className="flex items-center gap-3">
             <button
-              onClick={handleLeaveRoom}
+              onClick={handleBackToHome}
               className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
-              title="Leave Room"
+              title="Browse Home (Keep Listening)"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -609,6 +691,27 @@ export const ListeningRoomPage: React.FC = () => {
             >
               {copiedLink ? "Copied! 🎉" : "Click to copy link"}
             </Button>
+
+            {/* Host Delete Room or Listener Leave Button */}
+            {isHost ? (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                title="Delete and close room for everyone"
+                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete Room</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleExplicitLeave}
+                title="Leave room"
+                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Leave</span>
+              </button>
+            )}
 
             {/* Current User Badge */}
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-zinc-800 text-xs">
@@ -771,6 +874,39 @@ export const ListeningRoomPage: React.FC = () => {
               >
                 <MessageSquare className="w-3 h-3" />
                 Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Host Delete Room Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-red-500/30 p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-white">Delete this Room?</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                This will permanently delete and close &quot;{room.name}&quot; for all connected listeners.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteRoom}
+                className="flex-1 py-2 text-xs font-semibold rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/30 transition-all cursor-pointer"
+              >
+                Delete Room
               </button>
             </div>
           </div>

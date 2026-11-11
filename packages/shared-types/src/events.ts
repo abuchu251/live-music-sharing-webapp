@@ -15,6 +15,9 @@ export interface ClientToServerEvents {
     callback: (response: { ok: boolean; room?: Room; participantId?: string; error?: string }) => void
   ) => void;
   "room:leave": () => void;
+  "room:close": (
+    callback: (response: { ok: boolean; error?: string }) => void
+  ) => void;
 
   // Playback events (host only)
   "playback:command": (

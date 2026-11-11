@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   Play,
   Pause,
@@ -12,6 +12,9 @@ import {
   Link as LinkIcon,
   Radio,
   Plus,
+  Maximize,
+  Minimize,
+  Repeat,
 } from "lucide-react";
 import { YouTubePlayer, type YouTubePlayerHandle } from "./YouTubePlayer";
 import { Badge } from "../ui/Badge";
@@ -50,6 +53,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   onOpenAddSong,
 }) => {
   const playerRef = useRef<YouTubePlayerHandle>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(currentSong?.duration || 0);
@@ -58,6 +62,25 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [autoPlayQueue, setAutoPlayQueue] = useState(true);
+
+  const handleToggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      containerRef.current.requestFullscreen().catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
 
   // Real-Time Playback Synchronization Hook
   const {
@@ -165,18 +188,21 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   return (
     <div className="w-full space-y-4">
       {/* Real YouTube Player Container */}
-      <div className="relative w-full rounded-3xl overflow-hidden bg-zinc-950 border border-zinc-800 shadow-2xl group">
+      <div
+        ref={containerRef}
+        className="relative w-full rounded-3xl overflow-hidden bg-zinc-950 border border-zinc-800 shadow-2xl group"
+      >
         <YouTubePlayer
           ref={playerRef}
           videoId={activeVideoId}
           autoplay={false}
-          controls={true}
+          controls={false}
           onTimeUpdate={(curr, dur) => {
             setCurrentTime(curr);
             if (dur > 0) setDuration(dur);
           }}
           onEnded={() => {
-            if (isHost && onNextTrack) onNextTrack();
+            if (isHost && onNextTrack && autoPlayQueue) onNextTrack();
           }}
         />
 
@@ -248,9 +274,18 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             </span>
           </div>
 
-          <span className="text-[11px] font-mono text-zinc-300 bg-black/60 px-2 py-0.5 rounded-full border border-zinc-800 backdrop-blur-sm">
-            ID: {activeVideoId} (rev {playbackState.revision})
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-zinc-300 bg-black/60 px-2 py-0.5 rounded-full border border-zinc-800 backdrop-blur-sm">
+              ID: {activeVideoId} (rev {playbackState.revision})
+            </span>
+            <button
+              onClick={handleToggleFullscreen}
+              className="pointer-events-auto p-1.5 rounded-full bg-black/60 hover:bg-black/90 border border-zinc-700 text-zinc-300 hover:text-white transition-all cursor-pointer shadow-md backdrop-blur-sm"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Video"}
+            >
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -437,6 +472,20 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
               }`}
             >
               <SkipForward className="w-4 h-4" />
+            </button>
+
+            {/* Auto-Play Queue Toggle */}
+            <button
+              onClick={() => setAutoPlayQueue((prev) => !prev)}
+              title={autoPlayQueue ? "Auto-Play Queue: Enabled (continuous play)" : "Auto-Play Queue: Disabled"}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                autoPlayQueue
+                  ? "bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30"
+                  : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Repeat className={`w-3.5 h-3.5 ${autoPlayQueue ? "text-purple-400" : "text-zinc-500"}`} />
+              <span className="hidden sm:inline">Autoplay</span>
             </button>
           </div>
 

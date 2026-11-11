@@ -13,6 +13,7 @@ import {
   Play,
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
+import { copyToClipboard } from "../../utils/clipboard";
 import { Badge } from "../../components/ui/Badge";
 import type { QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "./mockData";
@@ -80,17 +81,21 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   }, [chatMessages, activeTab]);
 
   const handleCopyRoomCode = () => {
-    navigator.clipboard.writeText(roomId).then(() => {
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2000);
+    copyToClipboard(roomId).then((ok) => {
+      if (ok) {
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      }
     });
   };
 
   const handleCopyLink = () => {
     const url = typeof window !== "undefined" ? `${window.location.origin}/room/${roomId}` : roomId;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
+    copyToClipboard(url).then((ok) => {
+      if (ok) {
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      }
     });
   };
 

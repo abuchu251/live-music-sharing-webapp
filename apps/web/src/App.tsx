@@ -6,6 +6,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { ListeningRoomPage } from "./pages/ListeningRoomPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { FloatingMiniPlayer } from "./components/player/FloatingMiniPlayer";
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <AuthModal />
+          <FloatingMiniPlayer />
         </div>
       </AuthProvider>
     </ErrorBoundary>

@@ -23,6 +23,16 @@ export function usePlaybackSync({
   const [currentDrift, setCurrentDrift] = useState<number>(0);
   const [isLocallyPaused, setIsLocallyPaused] = useState<boolean>(false);
 
+  // Keep callback and props in refs to guarantee stable reconciliation without tearing down sockets
+  const onTrackChangeRef = useRef(onTrackChange);
+  onTrackChangeRef.current = onTrackChange;
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+  const isLocallyPausedRef = useRef(isLocallyPaused);
+  isLocallyPausedRef.current = isLocallyPaused;
+  const playbackStateRef = useRef(playbackState);
+  playbackStateRef.current = playbackState;
+
   // Clock offset in ms between client and server (serverTime = Date.now() + clockOffset)
   const clockOffsetRef = useRef<number>(0);
   const isProgrammaticUpdateRef = useRef<boolean>(false);
@@ -76,14 +86,14 @@ export function usePlaybackSync({
         setCurrentDrift(drift);
 
         // Check video track change
-        if (targetState.videoId && targetState.videoId !== playbackState.videoId) {
-          if (onTrackChange) onTrackChange(targetState.videoId);
+        if (targetState.videoId && targetState.videoId !== playbackStateRef.current.videoId) {
+          if (onTrackChangeRef.current) onTrackChangeRef.current(targetState.videoId);
           player.loadVideo(targetState.videoId, Math.floor(expectedPos));
         }
 
         if (targetState.status === "playing") {
           // If listener is locally paused, respect their local pause
-          if (!isHost && isLocallyPaused) {
+          if (!isHostRef.current && isLocallyPausedRef.current) {
             player.pause();
             setSyncStatus("paused");
             return;
@@ -124,7 +134,7 @@ export function usePlaybackSync({
         }, 400);
       }
     },
-    [calculateExpectedPosition, onTrackChange, playbackState.videoId, playerRef]
+    [calculateExpectedPosition, playerRef]
   );
 
   // Listen to authoritative state updates from the server
