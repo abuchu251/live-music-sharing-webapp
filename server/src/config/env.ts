@@ -7,6 +7,7 @@ dotenv.config({ path: resolve(import.meta.dirname, "../../.env") });
 export const env = {
   port: parseInt(process.env["PORT"] ?? "3001", 10),
   nodeEnv: process.env["NODE_ENV"] ?? "development",
+  appUrl: process.env["APP_URL"] ?? "http://jemaw.live",
   corsOrigin: process.env["CORS_ORIGIN"] ?? "http://localhost:5173",
   jwtSecret: process.env["JWT_SECRET"] ?? "synctune-super-secret-jwt-key-2026",
   jwtExpiresIn: process.env["JWT_EXPIRES_IN"] ?? "7d",

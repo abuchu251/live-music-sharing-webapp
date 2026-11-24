@@ -165,7 +165,8 @@ export class RoomService {
     };
 
     const createdRoom = await this.repo.create(room);
-    const inviteUrl = `${env.corsOrigin}/room/${roomId}`;
+    const baseUrl = env.appUrl || (env.corsOrigin.startsWith("http") ? env.corsOrigin.split(",")[0]?.trim() : "http://jemaw.live");
+    const inviteUrl = `${baseUrl}/room/${roomId}`;
 
     return { room: createdRoom, host, inviteUrl };
   }

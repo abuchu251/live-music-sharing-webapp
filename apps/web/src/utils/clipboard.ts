@@ -1,8 +1,8 @@
 /**
  * Universal clipboard copy utility with fallback for non-HTTPS / HTTP environments.
  * Standard `navigator.clipboard` is restricted to secure contexts (HTTPS or localhost).
- * On HTTP IP deployments (e.g. AWS Lightsail http://3.126.82.53), this fallback ensures
- * copy commands still succeed reliably.
+ * On HTTP deployments (e.g. jemaw.live or http://63.176.157.176), this fallback ensures
+ * copy commands still succeed reliably without secure context restrictions.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   if (typeof window === "undefined") return false;
