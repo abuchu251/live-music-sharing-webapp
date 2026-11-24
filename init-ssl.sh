@@ -16,10 +16,13 @@ if [ $(swapon --show | wc -l) -le 1 ]; then
   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab 2>/dev/null || true
 fi
 
-# 2. Restart Docker daemon to clear any stale builder states
-echo "Ensuring Docker daemon is active..."
-sudo systemctl restart docker
-sleep 2
+# 2. Fix Docker DNS resolution (prevents NameResolutionError inside containers)
+if [ ! -f /etc/docker/daemon.json ] || ! grep -q "8.8.8.8" /etc/docker/daemon.json 2>/dev/null; then
+  echo "Configuring reliable DNS (8.8.8.8, 1.1.1.1) for Docker daemon..."
+  echo '{"dns": ["8.8.8.8", "1.1.1.1"]}' | sudo tee /etc/docker/daemon.json
+  sudo systemctl restart docker
+  sleep 2
+fi
 
 # 3. Prepare directories
 mkdir -p ./certbot/conf/live/$DOMAIN
@@ -34,11 +37,11 @@ if [ ! -f ./certbot/conf/live/$DOMAIN/fullchain.pem ] || [ ! -f ./certbot/conf/l
     -subj "/CN=localhost"
 fi
 
-# 5. Start containers (instant start, no slow rebuild needed)
+# 5. Start containers
 echo "Starting web and backend containers..."
 docker compose up -d web server db
 
-# 6. Request production Let's Encrypt certificate
+# 6. Request production Let's Encrypt certificate with explicit public DNS
 echo "Requesting verified Let's Encrypt SSL certificate..."
 docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
   -d $DOMAIN -d www.$DOMAIN \
