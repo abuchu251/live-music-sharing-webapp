@@ -29,14 +29,19 @@ RUN pnpm --filter @synctune/web build
 # Stage 2: Nginx Web Server
 FROM nginx:alpine AS runner
 
+RUN apk add --no-cache openssl
+
 # Remove default configuration and copy custom Nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Copy compiled SPA static assets
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 80 443
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
 

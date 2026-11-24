@@ -51,10 +51,21 @@ jobs:
             echo "Starting SyncTune continuous deployment..."
             cd /home/ubuntu/synctune
             git pull origin main
+            chmod +x ./init-ssl.sh 2>/dev/null || true
             echo "Building containers sequentially to prevent memory thrashing..."
             docker compose build web
             docker compose build server
             docker compose up -d --remove-orphans
             docker exec synctune-server npx prisma db push --skip-generate
-            echo "SyncTune deployed successfully!"
+
+            # Check and provision Let's Encrypt SSL certificate if not yet present
+            if [ ! -f ./certbot/conf/live/jemaw.live/privkey.pem ] || grep -q "localhost" ./certbot/conf/live/jemaw.live/fullchain.pem 2>/dev/null; then
+              echo "Requesting Let's Encrypt SSL certificate for jemaw.live and www.jemaw.live..."
+              docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+                -d jemaw.live -d www.jemaw.live \
+                --email admin@jemaw.live --agree-tos --no-eff-email || true
+              docker compose exec -T web nginx -s reload || true
+            fi
+
+            echo "SyncTune deployed successfully with HTTPS!"
 

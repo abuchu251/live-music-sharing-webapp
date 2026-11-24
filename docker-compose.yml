@@ -34,8 +34,8 @@ services:
       DATABASE_URL: postgresql://synctune:synctune_secure_password_2026@db:5432/synctune?schema=public
       JWT_SECRET: production-secret-synctune-jwt-key-change-in-prod
       JWT_EXPIRES_IN: 7d
-      APP_URL: http://jemaw.live
-      CORS_ORIGIN: "http://jemaw.live,https://jemaw.live,http://www.jemaw.live,https://www.jemaw.live,http://63.176.157.176,http://localhost:5173,*"
+      APP_URL: https://jemaw.live
+      CORS_ORIGIN: "https://jemaw.live,http://jemaw.live,https://www.jemaw.live,http://www.jemaw.live,http://63.176.157.176,http://localhost:5173,*"
     expose:
       - "3001"
     healthcheck:
@@ -46,7 +46,7 @@ services:
     networks:
       - synctune-network
 
-  # ─── SyncTune Web Frontend (Nginx) ──────────────────────────
+  # ─── SyncTune Web Frontend (Nginx + SSL) ─────────────────────
   web:
     build:
       context: .
@@ -57,7 +57,22 @@ services:
       - server
     ports:
       - "80:80"
-      - "3000:80"
+      - "443:443"
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - synctune-network
+
+  # ─── Certbot for SSL Certificate Renewal ─────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: synctune-certbot
+    restart: unless-stopped
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - synctune-network
 
