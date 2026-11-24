@@ -13,7 +13,7 @@ echo "Starting web container..."
 docker compose up -d web
 
 echo "Requesting production SSL certificate from Let's Encrypt..."
-docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
   -d $DOMAIN -d www.$DOMAIN \
   --email $EMAIL --agree-tos --no-eff-email --force-renewal
 
