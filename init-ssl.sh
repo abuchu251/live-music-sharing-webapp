@@ -10,7 +10,7 @@ mkdir -p ./certbot/conf/live/$DOMAIN
 mkdir -p ./certbot/www
 
 echo "Starting web container..."
-docker compose up -d web
+docker compose up -d --build web
 
 echo "Requesting production SSL certificate from Let's Encrypt..."
 docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
