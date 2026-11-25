@@ -1,6 +1,6 @@
 // ─── Participant ───────────────────────────────────────────
 
-export type ParticipantRole = "HOST" | "LISTENER";
+export type ParticipantRole = "HOST" | "COHOST" | "LISTENER";
 
 export interface Participant {
   id: string;

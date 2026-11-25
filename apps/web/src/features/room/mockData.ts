@@ -15,7 +15,7 @@ export interface MockParticipant {
   id: string;
   username: string;
   avatar: string;
-  role: "HOST" | "LISTENER";
+  role: "HOST" | "COHOST" | "LISTENER";
   status: "online" | "offline" | "buffering";
   ping: number; // in ms
 }

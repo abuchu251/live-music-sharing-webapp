@@ -22,6 +22,7 @@ export interface RoomSidebarProps {
   roomId: string;
   roomName: string;
   isHost: boolean;
+  isCohost?: boolean;
   currentUser: { username: string; avatar: string };
   queue: QueueItem[];
   participants: MockParticipant[];
@@ -31,6 +32,7 @@ export interface RoomSidebarProps {
   onSendMessage: (content: string) => void;
   onPlaySong?: (song: QueueItem, index: number) => void;
   onReorderQueue?: (newQueue: QueueItem[]) => void;
+  onSetRole?: (participantId: string, role: "COHOST" | "LISTENER") => void;
   activeTab?: "queue" | "participants" | "chat";
   onTabChange?: (tab: "queue" | "participants" | "chat") => void;
   replyPrefill?: string;
@@ -43,6 +45,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   roomId,
   roomName,
   isHost,
+  isCohost = false,
   currentUser,
   queue,
   participants,
@@ -52,11 +55,13 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onSendMessage,
   onPlaySong,
   onReorderQueue,
+  onSetRole,
   activeTab: activeTabProp,
   onTabChange,
   replyPrefill,
   onClearReplyPrefill,
 }) => {
+  const canManageQueue = isHost || isCohost;
   const [internalTab, setInternalTab] = useState<"queue" | "participants" | "chat">("queue");
   const activeTab = activeTabProp || internalTab;
   const setActiveTab = (tab: "queue" | "participants" | "chat") => {
@@ -416,7 +421,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 return (
                   <div
                     key={song.id}
-                    draggable={isHost}
+                    draggable={canManageQueue}
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
@@ -439,9 +444,9 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                       {/* Drag Handle to the left of numbering */}
                       <div
                         className={`p-0.5 text-tertiary group-hover:text-on-surface transition-colors ${
-                          isHost ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-40"
+                          canManageQueue ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-40"
                         }`}
-                        title={isHost ? "Drag to reorder track" : "Only host can reorder"}
+                        title={canManageQueue ? "Drag to reorder track" : "Only host or co-host can reorder"}
                       >
                         <GripVertical className="w-3.5 h-3.5" />
                       </div>
@@ -465,7 +470,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                         {formatSeconds(song.duration || 210)}
                       </span>
 
-                      {isHost && onPlaySong && (
+                      {canManageQueue && onPlaySong && (
                         <button
                           onClick={() => onPlaySong(song, index)}
                           className="p-1 text-tertiary hover:text-primary transition-colors cursor-pointer"
@@ -476,14 +481,16 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                         </button>
                       )}
 
-                      <button
-                        onClick={() => onRemoveSong(song.id)}
-                        className="p-1 text-tertiary hover:text-error transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                        title="Remove song"
-                        type="button"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canManageQueue && (
+                        <button
+                          onClick={() => onRemoveSong(song.id)}
+                          className="p-1 text-tertiary hover:text-error transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                          title="Remove song"
+                          type="button"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -521,18 +528,41 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                       {person.role === "HOST" && (
                         <Crown className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
                       )}
+                      {person.role === "COHOST" && (
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 font-mono text-[9px] font-bold">
+                          CO-HOST
+                        </span>
+                      )}
                     </p>
                     <p className="font-mono text-[10px] text-tertiary">
-                      {person.role === "HOST" ? "Studio Host" : "Listener"}
+                      {person.role === "HOST" ? "Studio Host" : person.role === "COHOST" ? "Co-Host" : "Listener"}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                  <span className="font-mono text-[11px] text-secondary font-semibold">
-                    {person.ping ? `${person.ping}ms` : "24ms"}
-                  </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Host Promote / Demote Controls */}
+                  {isHost && person.role !== "HOST" && onSetRole && (
+                    <button
+                      type="button"
+                      onClick={() => onSetRole(person.id, person.role === "COHOST" ? "LISTENER" : "COHOST")}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer border ${
+                        person.role === "COHOST"
+                          ? "bg-surface-container hover:bg-error/10 text-tertiary hover:text-error border-outline-variant"
+                          : "bg-primary/10 hover:bg-primary text-primary hover:text-white border-primary/30"
+                      }`}
+                      title={person.role === "COHOST" ? "Demote to listener" : "Promote to co-host"}
+                    >
+                      {person.role === "COHOST" ? "Demote" : "+ Co-Host"}
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                    <span className="font-mono text-[11px] text-secondary font-semibold">
+                      {person.ping ? `${person.ping}ms` : "24ms"}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}

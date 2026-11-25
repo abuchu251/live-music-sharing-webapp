@@ -30,17 +30,29 @@ export function registerPlaybackHandlers(
         return;
       }
 
-      // Authoritative host check against room state
-      if (room.hostId !== participantId && socket.data.role !== "HOST") {
+      // Authoritative host or co-host check against room state
+      const participant = room.participants.find((p) => p.id === participantId);
+      const isPrivileged =
+        room.hostId === participantId ||
+        socket.data.role === "HOST" ||
+        socket.data.role === "COHOST" ||
+        participant?.role === "HOST" ||
+        participant?.role === "COHOST";
+
+      if (!isPrivileged) {
         callback({
           ok: false,
-          error: "Unauthorized: Only the room host can control playback.",
+          error: "Unauthorized: Only the room host or co-host can control playback.",
         });
         return;
       }
 
       // Upgrade socket role if needed
-      socket.data.role = "HOST";
+      if (room.hostId === participantId) {
+        socket.data.role = "HOST";
+      } else if (participant?.role === "COHOST") {
+        socket.data.role = "COHOST";
+      }
 
       const updatedState = await playbackService.processCommand(
         roomId,

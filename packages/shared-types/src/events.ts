@@ -18,6 +18,10 @@ export interface ClientToServerEvents {
   "room:close": (
     callback: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "room:set-role": (
+    data: { targetParticipantId: string; role: "COHOST" | "LISTENER" },
+    callback: (response: { ok: boolean; error?: string }) => void
+  ) => void;
 
   // Playback events (host only)
   "playback:command": (

@@ -132,6 +132,59 @@ export function registerRoomHandlers(
     }
   });
 
+  // Host promotes or demotes a participant (e.g. to COHOST or back to LISTENER)
+  socket.on("room:set-role", async (data, callback) => {
+    const { roomId, participantId } = socket.data;
+    if (!roomId || !participantId) {
+      callback({ ok: false, error: "You must join a room first." });
+      return;
+    }
+
+    try {
+      const { targetParticipantId, role: newRole } = data;
+      const { participant } = await roomService.setParticipantRole(
+        roomId,
+        participantId,
+        targetParticipantId,
+        newRole
+      );
+
+      // Update in-memory socket role for target participant if connected
+      const sockets = await io.in(roomId).fetchSockets();
+      for (const s of sockets) {
+        if (s.data.participantId === targetParticipantId) {
+          s.data.role = newRole;
+        }
+      }
+
+      // Broadcast participant update to everyone in the room
+      io.to(roomId).emit("room:participant-updated", participant);
+
+      // Send system chat notification
+      const systemMessage = {
+        id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        roomId,
+        senderId: "system",
+        senderUsername: "System",
+        senderAvatar: "👑",
+        content:
+          newRole === "COHOST"
+            ? `👑 @${participant.username} has been promoted to Co-Host!`
+            : `@${participant.username} is now a Listener.`,
+        timestamp: Date.now(),
+        isHost: true,
+      };
+      io.to(roomId).emit("chat:message", systemMessage);
+
+      console.log(`[Socket] Host ${participantId} changed role of ${participant.username} to ${newRole}`);
+      callback({ ok: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to change participant role.";
+      console.error(`[Socket] room:set-role error:`, msg);
+      callback({ ok: false, error: msg });
+    }
+  });
+
   // Socket disconnected (tab closed, network dropped)
   socket.on("disconnect", async (reason) => {
     const { roomId, participantId, username } = socket.data;

@@ -418,6 +418,21 @@ export const ListeningRoomPage: React.FC = () => {
     navigate("/");
   };
 
+  const handleSetRole = (targetParticipantId: string, role: "COHOST" | "LISTENER") => {
+    const socket = getSocket();
+    socket.emit("room:set-role", { targetParticipantId, role }, (res) => {
+      if (!res.ok) {
+        alert(res.error || "Failed to update participant role.");
+      }
+    });
+  };
+
+  const currentParticipant = participants.find(
+    (p) => p.id === (participantId || sessionStorage.getItem(`synctune:participantId:${roomId}`)) || p.username === username
+  );
+  const isCohost = Boolean(currentParticipant?.role === "COHOST");
+  const canControlPlayback = isHost || isCohost;
+
   const sidebarParticipants: MockParticipant[] = participants.map((p) => ({
     id: p.id,
     username: p.username,
@@ -615,15 +630,19 @@ export const ListeningRoomPage: React.FC = () => {
               </button>
             )}
 
-            {/* Host Badge */}
+            {/* Host or Co-Host Badge */}
             <div className="hidden sm:flex items-center gap-1.5 pl-2 py-1 pr-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs text-xs">
               <span className="text-sm">{avatar}</span>
               <span className="font-semibold text-on-surface">{username}</span>
-              {isHost && (
+              {isHost ? (
                 <span className="px-1.5 py-0.5 rounded bg-primary text-white font-mono text-[10px] uppercase font-bold tracking-wider">
                   Host
                 </span>
-              )}
+              ) : isCohost ? (
+                <span className="px-1.5 py-0.5 rounded bg-amber-600 text-white font-mono text-[10px] uppercase font-bold tracking-wider">
+                  Co-Host
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -654,7 +673,7 @@ export const ListeningRoomPage: React.FC = () => {
           <section className="lg:col-span-8 flex flex-col gap-4">
             <RoomPlayer
               currentSong={currentSong}
-              isHost={isHost}
+              isHost={canControlPlayback}
               initialPlaybackState={room.currentPlaybackState}
               isPlaylistFinished={isPlaylistFinished}
               onNextTrack={handleNextTrack}
@@ -703,6 +722,7 @@ export const ListeningRoomPage: React.FC = () => {
               roomId={room.id}
               roomName={room.name}
               isHost={isHost}
+              isCohost={isCohost}
               currentUser={{ username, avatar }}
               queue={queue}
               participants={sidebarParticipants}
@@ -712,6 +732,7 @@ export const ListeningRoomPage: React.FC = () => {
               onReorderQueue={handleReorderQueue}
               onSendMessage={handleSendMessage}
               onPlaySong={handlePlayQueuedSong}
+              onSetRole={handleSetRole}
               activeTab={sidebarTab}
               onTabChange={setSidebarTab}
               replyPrefill={replyPrefill}

@@ -57,10 +57,17 @@ export function registerSocialHandlers(
     }
 
     try {
+      const roomInstance = await roomService.getRoom(roomId);
+      const participant = roomInstance?.participants.find((p) => p.id === participantId);
+      const isPrivileged =
+        role === "HOST" ||
+        role === "COHOST" ||
+        (roomInstance && (roomInstance.hostId === participantId || participant?.role === "COHOST"));
+
       const { room } = await roomService.removeQueueItem({
         roomId,
         participantId,
-        isHost: role === "HOST",
+        isHost: Boolean(isPrivileged),
         queueItemId: data.queueItemId,
       });
 
@@ -82,11 +89,15 @@ export function registerSocialHandlers(
 
     try {
       const roomInstance = await roomService.getRoom(roomId);
-      const isHost = role === "HOST" || (roomInstance && roomInstance.hostId === participantId);
+      const participant = roomInstance?.participants.find((p) => p.id === participantId);
+      const isPrivileged =
+        role === "HOST" ||
+        role === "COHOST" ||
+        (roomInstance && (roomInstance.hostId === participantId || participant?.role === "COHOST"));
 
       const { room } = await roomService.reorderQueue({
         roomId,
-        isHost,
+        isHost: Boolean(isPrivileged),
         queueItemIds: data.queueItemIds,
       });
 

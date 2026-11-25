@@ -287,6 +287,36 @@ export class RoomService {
   }
 
   /**
+   * Promote or demote a participant in the room (Host only).
+   */
+  async setParticipantRole(
+    roomId: string,
+    hostParticipantId: string,
+    targetParticipantId: string,
+    role: "COHOST" | "LISTENER"
+  ): Promise<{ room: Room; participant: Participant }> {
+    const room = await this.getRoom(roomId);
+
+    if (room.hostId !== hostParticipantId) {
+      throw new AppError(403, "Only the room host can assign roles.", "FORBIDDEN");
+    }
+
+    if (targetParticipantId === room.hostId) {
+      throw new AppError(400, "Cannot change the primary room host's role.", "INVALID_TARGET");
+    }
+
+    const participant = room.participants.find((p) => p.id === targetParticipantId);
+    if (!participant) {
+      throw new AppError(404, "Participant not found in room.", "NOT_FOUND");
+    }
+
+    participant.role = role;
+    const updated = await this.repo.update(room);
+
+    return { room: updated, participant };
+  }
+
+  /**
    * Remove a participant from a room.
    */
   async leaveRoom(
