@@ -52,24 +52,24 @@ export const FloatingMiniPlayer: React.FC = () => {
   return (
     <aside
       aria-label="Active Room Mini Player"
-      className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-3xl bg-zinc-900/95 border border-purple-500/40 p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-2xl bg-white/95 border border-outline p-4 shadow-xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
     >
       <div className="flex items-center gap-3">
-        {/* Pulsing Radio Icon */}
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-purple-600/30">
+        {/* Vermilion Radio Icon with subtle pulsing ring */}
+        <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
           <Radio className="w-5 h-5 animate-pulse" />
         </div>
 
         {/* Room & Song Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <h4 className="text-xs font-bold text-white truncate">
+            <span className="w-2 h-2 rounded-full bg-secondary shrink-0" />
+            <h4 className="text-xs font-bold text-on-surface truncate">
               {activeRoom.roomName}
             </h4>
           </div>
-          <p className="text-[11px] text-zinc-400 truncate flex items-center gap-1 mt-0.5">
-            <Music className="w-3 h-3 text-purple-400 shrink-0" />
+          <p className="text-[11px] text-on-surface-variant truncate flex items-center gap-1 mt-0.5 font-mono">
+            <Music className="w-3 h-3 text-primary shrink-0" />
             <span className="truncate">{activeRoom.currentSongTitle}</span>
           </p>
         </div>
@@ -77,7 +77,7 @@ export const FloatingMiniPlayer: React.FC = () => {
         {/* Close / Leave */}
         <button
           onClick={handleLeaveRoom}
-          className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="p-1 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-subtle transition-colors cursor-pointer"
           title="Disconnect from Room"
         >
           <X className="w-4 h-4" />
@@ -85,15 +85,15 @@ export const FloatingMiniPlayer: React.FC = () => {
       </div>
 
       {/* Action Bar */}
-      <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-zinc-500">
-          {activeRoom.isHost ? "👑 You are Host" : "🎧 Listening Live"}
+      <div className="mt-3 pt-2.5 border-t border-outline flex items-center justify-between gap-2">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
+          {activeRoom.isHost ? "👑 Studio Host" : "🎧 Synced Listener"}
         </span>
         <button
           onClick={handleReturnToRoom}
-          className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-hover text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
-          <span>Return to Room</span>
+          <span>Return to Session</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

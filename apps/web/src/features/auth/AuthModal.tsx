@@ -64,17 +64,17 @@ export function AuthModal() {
       <div className="space-y-5">
         {/* Toggle Mode Tabs (when not in guest mode) */}
         {!isGuestMode && (
-          <div className="flex border-b border-zinc-800 pb-2">
+          <div className="flex border-b border-outline pb-2">
             <button
               type="button"
               onClick={() => {
                 setError(null);
                 openAuthModal("login");
               }}
-              className={`flex-1 pb-2 text-center text-sm font-semibold transition-colors ${
+              className={`flex-1 pb-2 text-center text-sm font-semibold transition-colors cursor-pointer ${
                 authModalMode === "login"
-                  ? "border-b-2 border-purple-500 text-purple-400"
-                  : "text-zinc-400 hover:text-white"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Sign In
@@ -85,10 +85,10 @@ export function AuthModal() {
                 setError(null);
                 openAuthModal("register");
               }}
-              className={`flex-1 pb-2 text-center text-sm font-semibold transition-colors ${
+              className={`flex-1 pb-2 text-center text-sm font-semibold transition-colors cursor-pointer ${
                 authModalMode === "register"
-                  ? "border-b-2 border-purple-500 text-purple-400"
-                  : "text-zinc-400 hover:text-white"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
               Create Account
@@ -97,7 +97,7 @@ export function AuthModal() {
         )}
 
         {error && (
-          <div className="flex items-center gap-2.5 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+          <div className="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -111,11 +111,11 @@ export function AuthModal() {
                 placeholder="e.g. BeatsLover"
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
-                leftIcon={<User className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<User className="h-4 w-4 text-on-surface-variant" />}
               />
 
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                   Select Avatar
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -124,10 +124,10 @@ export function AuthModal() {
                       key={emoji}
                       type="button"
                       onClick={() => setAvatar(emoji)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform ${
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform cursor-pointer ${
                         avatar === emoji
-                          ? "border-2 border-purple-500 bg-purple-500/20 scale-110"
-                          : "border border-zinc-700 bg-zinc-800 hover:scale-105"
+                          ? "border-2 border-primary bg-primary/10 scale-105 shadow-xs"
+                          : "border border-outline bg-white hover:border-outline-strong hover:scale-105"
                       }`}
                     >
                       {emoji}
@@ -145,7 +145,7 @@ export function AuthModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                leftIcon={<Mail className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<Mail className="h-4 w-4 text-on-surface-variant" />}
               />
 
               <Input
@@ -155,7 +155,7 @@ export function AuthModal() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                leftIcon={<Lock className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<Lock className="h-4 w-4 text-on-surface-variant" />}
               />
             </div>
           ) : (
@@ -167,7 +167,7 @@ export function AuthModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                leftIcon={<Mail className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<Mail className="h-4 w-4 text-on-surface-variant" />}
               />
 
               <Input
@@ -177,7 +177,7 @@ export function AuthModal() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                leftIcon={<User className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<User className="h-4 w-4 text-on-surface-variant" />}
               />
 
               <Input
@@ -187,11 +187,11 @@ export function AuthModal() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                leftIcon={<Lock className="h-4 w-4 text-zinc-400" />}
+                leftIcon={<Lock className="h-4 w-4 text-on-surface-variant" />}
               />
 
               <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
                   Select Avatar
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -200,10 +200,10 @@ export function AuthModal() {
                       key={emoji}
                       type="button"
                       onClick={() => setAvatar(emoji)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform ${
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-transform cursor-pointer ${
                         avatar === emoji
-                          ? "border-2 border-purple-500 bg-purple-500/20 scale-110"
-                          : "border border-zinc-700 bg-zinc-800 hover:scale-105"
+                          ? "border-2 border-primary bg-primary/10 scale-105 shadow-xs"
+                          : "border border-outline bg-white hover:border-outline-strong hover:scale-105"
                       }`}
                     >
                       {emoji}
@@ -238,7 +238,7 @@ export function AuthModal() {
                 setError(null);
                 setIsGuestMode(false);
               }}
-              className="text-xs text-purple-400 hover:text-purple-300 hover:underline"
+              className="text-xs text-primary hover:underline cursor-pointer"
             >
               Already have an account? Sign In or Register
             </button>
@@ -249,9 +249,9 @@ export function AuthModal() {
                 setError(null);
                 setIsGuestMode(true);
               }}
-              className="flex items-center justify-center gap-1.5 mx-auto text-xs text-zinc-400 hover:text-white transition-colors"
+              className="flex items-center justify-center gap-1.5 mx-auto text-xs text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
             >
-              <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
               Just browsing? Continue as Guest
             </button>
           )}

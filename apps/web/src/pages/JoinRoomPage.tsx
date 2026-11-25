@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
-import { KeyRound, User, ArrowLeft, LogIn, Radio, Users } from "lucide-react";
+import { KeyRound, User, ArrowLeft, LogIn, Radio, Users, Check } from "lucide-react";
 import { Navbar } from "../components/layout/Navbar";
 import { Footer } from "../components/layout/Footer";
 import { Button } from "../components/ui/Button";
@@ -11,14 +11,25 @@ import { joinRoom, listActiveRooms } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Room } from "@synctune/shared-types";
 
-const AVATAR_PRESETS = ["🎧", "🎵", "🎸", "🎹", "🎷", "🎺", "🥁", "🎤", "👾", "✨"];
+const DESK_AVATARS = [
+  { emoji: "⚡", label: "Bolt" },
+  { emoji: "🎧", label: "Studio" },
+  { emoji: "☕", label: "Coffee" },
+  { emoji: "🪴", label: "Plant" },
+  { emoji: "💡", label: "Idea" },
+  { emoji: "🎹", label: "Keys" },
+  { emoji: "📻", label: "Radio" },
+  { emoji: "🎙️", label: "Mic" },
+  { emoji: "✨", label: "Sparkle" },
+  { emoji: "🐈", label: "Desk Cat" },
+];
 
 export const JoinRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [roomId, setRoomId] = useState("");
   const [username, setUsername] = useState(user?.username || "");
-  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || AVATAR_PRESETS[1] || "🎵");
+  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || DESK_AVATARS[1]?.emoji || "🎧");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeRooms, setActiveRooms] = useState<Room[]>([]);
@@ -116,42 +127,42 @@ export const JoinRoomPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen flex flex-col bg-surface text-on-surface">
       <Navbar />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-12 space-y-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to Home</span>
+          <span>Back to Overview</span>
         </Link>
 
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-purple-600/30">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mx-auto shadow-xs">
             <Radio className="w-6 h-6" />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
+          <h1 className="text-3xl font-extrabold tracking-tight text-on-surface font-sans">
             Join a Listening Room
           </h1>
-          <p className="text-sm text-zinc-400 max-w-md mx-auto">
-            Paste a room code or invite URL to sync playback with the host in real time.
+          <p className="text-sm text-on-surface-variant max-w-md mx-auto">
+            Paste a room code or invite URL to synchronize playback with the host down to the millisecond.
           </p>
         </div>
 
         {/* Form Card */}
-        <Card className="p-6 sm:p-8 max-w-lg mx-auto bg-zinc-900/80 border-zinc-800 shadow-2xl space-y-6">
+        <Card className="p-6 sm:p-8 max-w-lg mx-auto bg-white border-outline shadow-sm space-y-6 rounded-2xl">
           <form onSubmit={handleJoin} className="space-y-5">
             {error && (
-              <div className="p-3 text-xs bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
+              <div className="p-3 text-xs bg-red-50 border border-red-200 text-red-600 rounded-lg">
                 {error}
               </div>
             )}
 
             <Input
               label="Room Code or Full URL"
-              placeholder="e.g. room-alpha-9 or https://..."
+              placeholder="e.g. tokyo-lofi-204 or https://jemaw.live/room/..."
               value={roomId}
               onChange={(e) => {
                 setRoomId(e.target.value);
@@ -164,7 +175,7 @@ export const JoinRoomPage: React.FC = () => {
 
             <Input
               label="Your Display Name"
-              placeholder="e.g. Alex"
+              placeholder="e.g. Alex (Design Lead)"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value);
@@ -175,25 +186,37 @@ export const JoinRoomPage: React.FC = () => {
             />
 
             {/* Avatar Selector */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-zinc-300">
-                Choose Your Listener Avatar
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                Select Your Desk Avatar
               </label>
               <div className="grid grid-cols-5 gap-2">
-                {AVATAR_PRESETS.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setSelectedAvatar(icon)}
-                    className={`h-11 rounded-xl text-xl flex items-center justify-center border transition-all cursor-pointer ${
-                      selectedAvatar === icon
-                        ? "bg-purple-600/30 border-purple-500 text-white shadow-md shadow-purple-600/20 scale-105"
-                        : "bg-zinc-800/60 border-zinc-700/60 hover:border-zinc-500 text-zinc-300"
-                    }`}
-                  >
-                    {icon}
-                  </button>
-                ))}
+                {DESK_AVATARS.map((avatar) => {
+                  const isSelected = selectedAvatar === avatar.emoji;
+                  return (
+                    <button
+                      key={avatar.label}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar.emoji)}
+                      title={avatar.label}
+                      className={`relative aspect-square flex flex-col items-center justify-center rounded-xl border text-xl transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20 shadow-xs"
+                          : "border-outline bg-white hover:border-outline-strong text-on-surface"
+                      }`}
+                    >
+                      <span>{avatar.emoji}</span>
+                      <span className="text-[9px] mt-0.5 text-on-surface-variant truncate max-w-full px-1">
+                        {avatar.label}
+                      </span>
+                      {isSelected && (
+                        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary text-white flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -205,17 +228,17 @@ export const JoinRoomPage: React.FC = () => {
               isLoading={isLoading}
               leftIcon={<LogIn className="w-4 h-4" />}
             >
-              Enter Room & Sync
+              Enter Room & Sync Audio
             </Button>
           </form>
         </Card>
 
         {/* Active Public Rooms */}
         {activeRooms.length > 0 && (
-          <div className="space-y-4 pt-6 border-t border-zinc-900">
+          <div className="space-y-4 pt-6 border-t border-outline">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider">
-                Active Listening Rooms ({activeRooms.length})
+              <h3 className="text-xs font-semibold text-on-surface uppercase tracking-wider font-mono">
+                Active Studio Sessions ({activeRooms.length})
               </h3>
               <Badge variant="emerald" size="sm" dot>
                 Live Now
@@ -227,23 +250,23 @@ export const JoinRoomPage: React.FC = () => {
                 <Card
                   key={room.id}
                   variant="interactive"
-                  className="p-4 bg-zinc-900/40 border-zinc-800/80 space-y-2.5"
+                  className="p-4 bg-white border-outline hover:border-primary/40 space-y-2.5 rounded-xl shadow-xs transition-all"
                   onClick={() => handleJoinPublic(room.id)}
                 >
-                  <div className="flex items-center justify-between text-xs text-zinc-400">
-                    <span className="text-purple-400 font-medium">Room</span>
-                    <span className="flex items-center gap-1 text-emerald-400">
+                  <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                    <span className="text-primary font-medium font-mono text-[11px]">Active Session</span>
+                    <span className="flex items-center gap-1 text-secondary font-mono text-[11px]">
                       <Users className="w-3 h-3" /> {room.participants.length}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white truncate">
+                  <h4 className="text-sm font-bold text-on-surface truncate font-sans">
                     {room.name}
                   </h4>
-                  <p className="text-[11px] text-zinc-400 font-mono">
+                  <p className="text-[11px] text-on-surface-variant font-mono">
                     ID: {room.id}
                   </p>
-                  <div className="pt-2 text-xs text-purple-400 font-medium">
-                    Join Room &rarr;
+                  <div className="pt-2 text-xs text-primary font-semibold flex items-center gap-1">
+                    Connect & Listen &rarr;
                   </div>
                 </Card>
               ))}

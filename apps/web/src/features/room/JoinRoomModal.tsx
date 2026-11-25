@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-import { LogIn, KeyRound, User } from "lucide-react";
+import { LogIn, KeyRound, User, Check } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -12,8 +12,17 @@ export interface JoinRoomModalProps {
   initialRoomId?: string;
 }
 
-const AVATAR_PRESETS = [
-  "🎧", "🎵", "🎸", "🎹", "🎷", "🎺", "🥁", "🎤", "👾", "✨"
+const DESK_AVATARS = [
+  { id: "headphones", icon: "🎧" },
+  { id: "note", icon: "🎵" },
+  { id: "guitar", icon: "🎸" },
+  { id: "piano", icon: "🎹" },
+  { id: "sax", icon: "🎷" },
+  { id: "vinyl", icon: "💿" },
+  { id: "radio", icon: "📻" },
+  { id: "mic", icon: "🎤" },
+  { id: "synth", icon: "🎛️" },
+  { id: "coffee", icon: "☕" },
 ];
 
 export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
@@ -23,8 +32,8 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const [roomId, setRoomId] = useState(initialRoomId);
-  const [username, setUsername] = useState("");
-  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[1] || "🎵");
+  const [username, setUsername] = useState(localStorage.getItem("synctune:pref:username") || "");
+  const [selectedAvatar, setSelectedAvatar] = useState(localStorage.getItem("synctune:pref:avatar") || "🎵");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +41,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
     e.preventDefault();
     const cleanId = roomId.trim();
     if (!cleanId) {
-      setError("Please enter a valid room ID or paste an invite link.");
+      setError("Please enter a valid room code or paste an invite link.");
       return;
     }
     if (!username.trim()) {
@@ -55,7 +64,6 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
         avatar: selectedAvatar,
       });
 
-      // Save credentials for tab session and user preferences
       sessionStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
       sessionStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
       sessionStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
@@ -83,66 +91,80 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      badge="Tune In"
       title="Join Listening Room"
-      description="Enter the Room ID or invite link and your display name to start listening."
+      description="Enter the Room Code or invite link and choose your desk avatar."
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && (
-          <div className="p-3 text-xs bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
+          <div className="p-3 text-xs bg-error/10 border border-error/30 text-error rounded-lg font-medium">
             {error}
           </div>
         )}
 
-        <Input
-          label="Room ID or Invitation Link"
-          placeholder="e.g. room-alpha-9 or https://..."
-          value={roomId}
-          onChange={(e) => {
-            setRoomId(e.target.value);
-            setError(null);
-          }}
-          leftIcon={<KeyRound className="w-4 h-4" />}
-          autoFocus
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-on-surface">Room Code or Invitation URL</label>
+          <Input
+            placeholder="e.g. SRN5WM or https://jemaw.live/room/..."
+            value={roomId}
+            onChange={(e) => {
+              setRoomId(e.target.value);
+              setError(null);
+            }}
+            leftIcon={<KeyRound className="w-4 h-4 text-tertiary" />}
+            autoFocus
+            required
+          />
+        </div>
 
-        <Input
-          label="Your Display Name"
-          placeholder="e.g. Jordan"
-          value={username}
-          onChange={(e) => {
-            setUsername(e.target.value);
-            setError(null);
-          }}
-          leftIcon={<User className="w-4 h-4" />}
-          required
-        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-on-surface">Your Display Name</label>
+          <Input
+            placeholder="Your name or handle"
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setError(null);
+            }}
+            leftIcon={<User className="w-4 h-4 text-tertiary" />}
+            required
+          />
+        </div>
 
         {/* Avatar Preset Selector */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-zinc-300">
-            Choose Your Avatar
-          </label>
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-semibold text-on-surface">Pick an Avatar</span>
+            <span className="text-[11px] text-tertiary">(shows in room listeners)</span>
+          </div>
           <div className="grid grid-cols-5 gap-2">
-            {AVATAR_PRESETS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                onClick={() => setSelectedAvatar(icon)}
-                className={`h-11 rounded-xl text-xl flex items-center justify-center border transition-all cursor-pointer ${
-                  selectedAvatar === icon
-                    ? "bg-purple-600/30 border-purple-500 text-white shadow-md shadow-purple-600/20 scale-105"
-                    : "bg-zinc-800/60 border-zinc-700/60 hover:border-zinc-500 text-zinc-300"
-                }`}
-              >
-                {icon}
-              </button>
-            ))}
+            {DESK_AVATARS.map((item) => {
+              const isSelected = selectedAvatar === item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedAvatar(item.icon)}
+                  className={`relative flex items-center justify-center h-12 rounded-lg border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-[#FFF7ED] border-primary text-primary shadow-[0_0_0_1.5px_#EA580C]"
+                      : "bg-surface border-outline-variant text-tertiary hover:text-on-surface hover:bg-surface-container"
+                  }`}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  {isSelected && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-2.5">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>
+        <div className="pt-2 flex items-center justify-end gap-2.5">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button
@@ -151,7 +173,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             isLoading={isLoading}
             leftIcon={<LogIn className="w-4 h-4" />}
           >
-            Join Room
+            Enter Studio
           </Button>
         </div>
       </form>

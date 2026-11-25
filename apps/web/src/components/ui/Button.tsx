@@ -2,7 +2,7 @@ import React from "react";
 import { Loader2 } from "lucide-react";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "dark";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -25,25 +25,27 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 active:scale-[0.98]";
+      "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none focus:outline-none focus:ring-2 focus:ring-primary/40 active:scale-[0.99]";
 
     const sizeStyles = {
       sm: "text-xs px-3 py-1.5 gap-1.5",
-      md: "text-sm px-4 py-2.5 gap-2",
-      lg: "text-base px-6 py-3.5 gap-2.5",
+      md: "text-sm px-4 py-2 gap-2",
+      lg: "text-base px-5 py-2.5 gap-2.5",
     };
 
     const variantStyles = {
       primary:
-        "bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-purple-600/25 hover:shadow-purple-600/40 border border-purple-500/30",
+        "bg-primary hover:bg-primary-container text-white shadow-sm border border-transparent font-semibold",
       secondary:
-        "bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-100 border border-zinc-700/50 hover:border-zinc-600 backdrop-blur-sm",
+        "bg-surface-container-lowest hover:bg-surface-container-low text-on-surface border border-outline-variant shadow-xs",
       outline:
-        "bg-transparent hover:bg-zinc-800/50 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-500",
+        "bg-transparent hover:bg-surface-container-low text-on-surface border border-outline-variant",
       ghost:
-        "bg-transparent hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-100",
+        "bg-transparent hover:bg-black/5 text-tertiary hover:text-on-surface",
+      dark:
+        "bg-inverse-surface hover:bg-black text-inverse-on-surface font-semibold shadow-xs",
       danger:
-        "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 hover:border-red-500/50",
+        "bg-error/10 hover:bg-error/20 text-error border border-error/30",
     };
 
     return (
@@ -58,7 +60,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ) : (
           leftIcon && <span className="shrink-0">{leftIcon}</span>
         )}
-        <span>{children}</span>
+        {children}
         {!isLoading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
       </button>
     );
@@ -66,4 +68,3 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = "Button";
-

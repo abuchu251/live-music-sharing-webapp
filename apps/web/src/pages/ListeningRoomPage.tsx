@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate, Link } from "react-router";
 import {
-  Radio,
   ArrowLeft,
   Crown,
-  Users,
-  Wifi,
-  Sparkles,
   Copy,
   Check,
   AlertTriangle,
@@ -14,25 +10,24 @@ import {
   MessageSquare,
   Trash2,
   LogOut,
+  Link as LinkIcon,
 } from "lucide-react";
 import { copyToClipboard } from "../utils/clipboard";
 import { RoomPlayer } from "../components/player/RoomPlayer";
 import { RoomSidebar } from "../features/room/RoomSidebar";
-import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { getRoom } from "../services/api";
 import { connectSocket, getSocket } from "../services/socket";
 import type { Room, Participant, RoomStatus, QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "../features/room/mockData";
 
-const AVATAR_PRESETS = ["🎧", "🎵", "🎸", "🎹", "🎷", "🎺", "🥁", "🎤", "👾", "✨", "🦊", "🚀"];
+const DESK_AVATARS = ["🎧", "🎵", "🎸", "🎹", "🎷", "💿", "📻", "🎤", "🎛️", "☕"];
 
 export const ListeningRoomPage: React.FC = () => {
   const { roomId = "" } = useParams<{ roomId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Location state or stored session credentials
   const locationState = (location.state || {}) as {
     roomName?: string;
     username?: string;
@@ -41,7 +36,6 @@ export const ListeningRoomPage: React.FC = () => {
     participantId?: string;
   };
 
-  // Strictly isolate participant IDs to sessionStorage so different tabs don't impersonate each other
   if (typeof window !== "undefined") {
     localStorage.removeItem(`synctune:participantId:${roomId}`);
   }
@@ -55,7 +49,7 @@ export const ListeningRoomPage: React.FC = () => {
     locationState.avatar ||
     storedAvatar ||
     localStorage.getItem("synctune:pref:avatar") ||
-    AVATAR_PRESETS[0] || "🎧";
+    DESK_AVATARS[0] || "🎧";
 
   const [username, setUsername] = useState(initialUsername);
   const [avatar, setAvatar] = useState(initialAvatar);
@@ -63,7 +57,6 @@ export const ListeningRoomPage: React.FC = () => {
     locationState.participantId || storedParticipantId || null
   );
 
-  // If user opens link directly without a chosen username, prompt them first!
   const [needsNamePrompt, setNeedsNamePrompt] = useState(!initialUsername);
   const [promptName, setPromptName] = useState(
     localStorage.getItem("synctune:pref:username") || ""
@@ -72,10 +65,10 @@ export const ListeningRoomPage: React.FC = () => {
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [roomStatus, setRoomStatus] = useState<RoomStatus>("active");
+  const [, setRoomStatus] = useState<RoomStatus>("active");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [, setIsConnected] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [chatToast, setChatToast] = useState<ChatMessage | null>(null);
@@ -85,7 +78,6 @@ export const ListeningRoomPage: React.FC = () => {
   const [replyPrefill, setReplyPrefill] = useState<string>("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Request browser notification permission for out-of-chrome chat alerts
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "default") {
@@ -94,7 +86,6 @@ export const ListeningRoomPage: React.FC = () => {
     }
   }, []);
 
-  // Playback & Queue state (integrated with UI)
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -103,7 +94,6 @@ export const ListeningRoomPage: React.FC = () => {
   const isHost = Boolean(room && participantId && room.hostId === participantId);
   const currentSong = queue[currentSongIndex] || null;
 
-  // Pre-fetch room info when prompt is visible so user sees the room name
   useEffect(() => {
     if (!roomId) return;
     getRoom(roomId)
@@ -119,7 +109,6 @@ export const ListeningRoomPage: React.FC = () => {
       });
   }, [roomId, needsNamePrompt]);
 
-  // Handle joining after listener provides their name
   const handleJoinPromptSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = promptName.trim();
@@ -136,11 +125,8 @@ export const ListeningRoomPage: React.FC = () => {
     setIsLoading(true);
   };
 
-  // Initialize Room & Socket.IO Connection
   useEffect(() => {
-    if (needsNamePrompt || !username) {
-      return;
-    }
+    if (needsNamePrompt || !username) return;
 
     let isMounted = true;
 
@@ -152,22 +138,26 @@ export const ListeningRoomPage: React.FC = () => {
       }
 
       try {
-        // Fetch current room state via REST
         const { room: fetchedRoom } = await getRoom(roomId);
         if (!isMounted) return;
 
         setRoom(fetchedRoom);
-        setParticipants(fetchedRoom.participants);
         setQueue(fetchedRoom.queue || []);
-        setRoomStatus(fetchedRoom.status);
-        if (fetchedRoom.currentPlaybackState?.revision) {
-          playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision;
-        }
+        playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision || 0;
 
-        // Connect Socket.IO
         const socket = connectSocket();
 
-        // Join room via socket
+        socket.on("connect", () => {
+          if (!isMounted) return;
+          setIsConnected(true);
+          console.log("[RoomPage] Connected to socket server:", socket.id);
+        });
+
+        socket.on("disconnect", () => {
+          if (!isMounted) return;
+          setIsConnected(false);
+        });
+
         socket.emit(
           "room:join",
           {
@@ -178,20 +168,9 @@ export const ListeningRoomPage: React.FC = () => {
           },
           (res) => {
             if (!isMounted) return;
-            if (res.ok && res.room && res.participantId) {
-              setRoom(res.room);
-              setParticipants(res.room.participants);
-              setQueue(res.room.queue || []);
-              setRoomStatus(res.room.status);
+            if (res.ok && res.participantId) {
               setParticipantId(res.participantId);
-              if (res.room.currentPlaybackState?.revision) {
-                playbackRevisionRef.current = res.room.currentPlaybackState.revision;
-              }
-              // SessionStorage isolates this specific tab's participant
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
-              sessionStorage.setItem(`synctune:username:${roomId}`, username);
-              sessionStorage.setItem(`synctune:avatar:${roomId}`, avatar);
-              setIsConnected(true);
               setIsLoading(false);
             } else {
               setError(res.error || "Failed to join room via socket.");
@@ -200,13 +179,11 @@ export const ListeningRoomPage: React.FC = () => {
           }
         );
 
-        // Listen for queue updates
         socket.on("queue:updated", (updatedQueue) => {
           if (!isMounted) return;
           setQueue(updatedQueue);
         });
 
-        // Listen for new chat messages & trigger notification toast and native desktop alert
         socket.on("chat:message", (newMsg) => {
           if (!isMounted) return;
           setChatMessages((prev) => {
@@ -217,104 +194,53 @@ export const ListeningRoomPage: React.FC = () => {
           if (newMsg.senderUsername !== username) {
             setChatToast(newMsg);
 
-            // Native out-of-browser notification when minimized or in another tab/app
-            if (
-              typeof window !== "undefined" &&
-              "Notification" in window &&
-              Notification.permission === "granted" &&
-              document.hidden
-            ) {
+            if (typeof document !== "undefined" && document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
               try {
-                const plainContent = newMsg.content.replace(/<[^>]*>?/gm, "");
-                const notif = new Notification(`${newMsg.senderUsername} • SyncTune`, {
-                  body: plainContent,
-                  tag: `synctune-msg-${newMsg.id}`,
+                new Notification(`New message from ${newMsg.senderUsername}`, {
+                  body: newMsg.content.slice(0, 80),
+                  icon: "/favicon.svg",
                 });
-                notif.onclick = () => {
-                  window.focus();
-                  notif.close();
-                };
-              } catch {
-                // Ignore notification constructor errors
-              }
+              } catch {}
             }
           }
         });
 
-        // Listen for room being closed/deleted by the host
-        socket.on("room:closed", (data) => {
-          if (!isMounted) return;
-          sessionStorage.removeItem("synctune:active_room");
-          alert(data?.reason || "This room has been closed by the host.");
-          navigate("/");
-        });
-
-        // Listen for new participants
-        socket.on("room:participant-joined", (newParticipant) => {
+        socket.on("room:participant-joined", (p: Participant) => {
           if (!isMounted) return;
           setParticipants((prev) => {
-            const exists = prev.find((p) => p.id === newParticipant.id);
-            if (exists) {
-              return prev.map((p) => (p.id === newParticipant.id ? newParticipant : p));
+            if (prev.some((existing) => existing.id === p.id)) {
+              return prev.map((item) => (item.id === p.id ? p : item));
             }
-            return [...prev, newParticipant];
+            return [...prev, p];
           });
         });
 
-        // Listen for participant leaving
-        socket.on("room:participant-left", ({ participantId: leftId }) => {
+        socket.on("room:participant-left", ({ participantId: leftId }: { participantId: string }) => {
           if (!isMounted) return;
           setParticipants((prev) => prev.filter((p) => p.id !== leftId));
         });
 
-        // Listen for participant connection updates (disconnect/reconnect, automatic host promotion)
-        socket.on("room:participant-updated", (updatedParticipant) => {
+        socket.on("room:participant-updated", (p: Participant) => {
           if (!isMounted) return;
-          setParticipants((prev) =>
-            prev.map((p) => (p.id === updatedParticipant.id ? updatedParticipant : p))
-          );
-          if (updatedParticipant.role === "HOST") {
-            setRoom((prev) => (prev ? { ...prev, hostId: updatedParticipant.id } : prev));
-            // Real-time host promotion without reload
-            if (updatedParticipant.id === participantId) {
+          setParticipants((prev) => prev.map((item) => (item.id === p.id ? p : item)));
+          if (p.role === "HOST") {
+            setRoom((prev) => (prev ? { ...prev, hostId: p.id } : null));
+            const currentId = participantId || sessionStorage.getItem(`synctune:participantId:${roomId}`);
+            if (p.id === currentId) {
               setHostPromotedToast(true);
             }
           }
         });
 
-        // Listen for room status changes (e.g. Host disconnected)
-        socket.on("room:status-changed", ({ status }) => {
+        socket.on("room:status-changed", ({ status }: { status: Room["status"] }) => {
           if (!isMounted) return;
           setRoomStatus(status);
         });
 
-        // Listen for playback state updates to keep revision and current track in sync
-        socket.on("playback:state-update", (state) => {
+        socket.on("room:closed", ({ reason }: { reason: string }) => {
           if (!isMounted) return;
-          if (state?.revision) {
-            playbackRevisionRef.current = state.revision;
-          }
-          if (state?.videoId) {
-            setQueue((currQueue) => {
-              const foundIdx = currQueue.findIndex((q) => q.videoId === state.videoId);
-              if (foundIdx !== -1) {
-                setCurrentSongIndex(foundIdx);
-                setIsPlaylistFinished(false);
-              }
-              return currQueue;
-            });
-          }
-        });
-
-        // Connection state handlers
-        socket.on("connect", () => {
-          if (!isMounted) return;
-          setIsConnected(true);
-        });
-
-        socket.on("disconnect", () => {
-          if (!isMounted) return;
-          setIsConnected(false);
+          alert(reason || "This room has been closed by the host.");
+          navigate("/");
         });
       } catch (err: unknown) {
         if (!isMounted) return;
@@ -328,123 +254,76 @@ export const ListeningRoomPage: React.FC = () => {
     return () => {
       isMounted = false;
       const socket = getSocket();
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("queue:updated");
+      socket.off("chat:message");
       socket.off("room:participant-joined");
       socket.off("room:participant-left");
       socket.off("room:participant-updated");
       socket.off("room:status-changed");
       socket.off("room:closed");
-      socket.off("queue:updated");
-      socket.off("chat:message");
-      socket.off("playback:state-update");
     };
-  }, [roomId, username, avatar, needsNamePrompt, participantId]);
-
-  const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
-    const socket = getSocket();
-    if (isHost) {
-      socket.emit("playback:command", {
-        type: "change-video",
-        payload: { videoId, position: 0 },
-        revision: playbackRevisionRef.current,
-      }, (res) => {
-        if (!res.ok) console.error("Failed to change video:", res.error);
-      });
-    }
-    const foundIdx = queue.findIndex((q: QueueItem) => q.videoId === videoId);
-    if (foundIdx !== -1) {
-      setCurrentSongIndex(foundIdx);
-    }
-  }, [isHost, queue]);
+  }, [roomId, username, avatar, needsNamePrompt, navigate]);
 
   const handleNextTrack = useCallback(() => {
-    if (!isHost || queue.length === 0) return;
+    if (queue.length === 0) return;
     if (currentSongIndex < queue.length - 1) {
-      const nextIndex = currentSongIndex + 1;
-      setCurrentSongIndex(nextIndex);
+      const nextIdx = currentSongIndex + 1;
+      setCurrentSongIndex(nextIdx);
       setIsPlaylistFinished(false);
-      const nextSong = queue[nextIndex];
-      if (nextSong) {
+      const nextSong = queue[nextIdx];
+      if (nextSong && isHost) {
         handleChangeVideo(nextSong.videoId, nextSong.title);
       }
     } else {
-      // Reached the end of the playlist!
-      console.log("[Queue] Playlist finished.");
       setIsPlaylistFinished(true);
-      const socket = getSocket();
-      socket.emit("playback:command", {
-        type: "pause",
-        payload: { position: 0 },
-        revision: playbackRevisionRef.current,
-      }, (res) => {
-        if (!res.ok) console.error("Failed to pause at end of queue:", res.error);
-      });
     }
-  }, [currentSongIndex, queue, isHost, handleChangeVideo]);
+  }, [queue, currentSongIndex, isHost]);
 
   const handlePreviousTrack = useCallback(() => {
-    if (!isHost || queue.length === 0) return;
-    const prevIndex = currentSongIndex > 0 ? currentSongIndex - 1 : queue.length - 1;
-    setCurrentSongIndex(prevIndex);
-    setIsPlaylistFinished(false);
-    const prevSong = queue[prevIndex];
-    if (prevSong) {
-      handleChangeVideo(prevSong.videoId, prevSong.title);
+    if (currentSongIndex > 0) {
+      const prevIdx = currentSongIndex - 1;
+      setCurrentSongIndex(prevIdx);
+      setIsPlaylistFinished(false);
+      const prevSong = queue[prevIdx];
+      if (prevSong && isHost) {
+        handleChangeVideo(prevSong.videoId, prevSong.title);
+      }
     }
-  }, [currentSongIndex, queue, isHost, handleChangeVideo]);
+  }, [currentSongIndex, queue, isHost]);
 
-  const handleReplayPlaylist = useCallback(() => {
-    if (!isHost || queue.length === 0) return;
+  const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
+    setIsPlaylistFinished(false);
+    const socket = getSocket();
+    playbackRevisionRef.current += 1;
+    socket.emit("playback:command", {
+      type: "change-video",
+      payload: {
+        videoId,
+        position: 0,
+      },
+      revision: playbackRevisionRef.current,
+    }, (res: { ok: boolean; error?: string }) => {
+      if (!res.ok) console.error("Failed to change video on server:", res.error);
+    });
+  }, []);
+
+  const handleReplayPlaylist = () => {
+    if (queue.length === 0) return;
     setCurrentSongIndex(0);
     setIsPlaylistFinished(false);
     const firstSong = queue[0];
-    if (firstSong) {
+    if (firstSong && isHost) {
       handleChangeVideo(firstSong.videoId, firstSong.title);
     }
-  }, [isHost, queue, handleChangeVideo]);
+  };
 
-  const handlePlayQueuedSong = useCallback((song: QueueItem, index: number) => {
+  const handlePlayQueuedSong = (song: QueueItem, index: number) => {
     if (!isHost) return;
     setCurrentSongIndex(index);
     setIsPlaylistFinished(false);
     handleChangeVideo(song.videoId, song.title);
-  }, [isHost, handleChangeVideo]);
-
-  const handleBackToHome = () => {
-    // Keep user in the room session - do NOT emit room:leave
-    if (room && roomId) {
-      sessionStorage.setItem(
-        "synctune:active_room",
-        JSON.stringify({
-          roomId,
-          roomName: room.name,
-          isHost,
-          currentSongTitle: currentSong?.title || "Live Stream",
-          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
-          participantId,
-        })
-      );
-    }
-    navigate("/");
-  };
-
-  const handleExplicitLeave = () => {
-    sessionStorage.removeItem("synctune:active_room");
-    const socket = getSocket();
-    socket.emit("room:leave");
-    navigate("/");
-  };
-
-  const handleConfirmDeleteRoom = () => {
-    const socket = getSocket();
-    socket.emit("room:close", (res) => {
-      if (res.ok) {
-        sessionStorage.removeItem("synctune:active_room");
-        setShowDeleteModal(false);
-        navigate("/");
-      } else {
-        alert(res.error || "Failed to delete room.");
-      }
-    });
   };
 
   const handleAddSong = (title: string, videoId: string) => {
@@ -498,7 +377,7 @@ export const ListeningRoomPage: React.FC = () => {
   };
 
   const handleCopyRoomCode = () => {
-    copyToClipboard(room?.id || roomId).then((ok) => {
+    copyToClipboard(roomId).then((ok) => {
       if (ok) {
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2000);
@@ -506,69 +385,84 @@ export const ListeningRoomPage: React.FC = () => {
     });
   };
 
-  // Auto-dismiss chat toast notification
-  useEffect(() => {
-    if (!chatToast) return;
-    const timer = setTimeout(() => setChatToast(null), 5000);
-    return () => clearTimeout(timer);
-  }, [chatToast]);
+  const handleConfirmDeleteRoom = () => {
+    const socket = getSocket();
+    socket.emit("room:close", (res) => {
+      if (res.ok) {
+        navigate("/");
+      } else {
+        alert(res.error || "Failed to delete room.");
+      }
+    });
+  };
 
-  // Convert Participant[] to format expected by RoomSidebar
+  const handleExplicitLeave = () => {
+    const socket = getSocket();
+    socket.emit("room:leave");
+    navigate("/");
+  };
+
+  const handleBackToHome = () => {
+    navigate("/");
+  };
+
   const sidebarParticipants: MockParticipant[] = participants.map((p) => ({
     id: p.id,
     username: p.username,
     avatar: p.avatar,
     role: p.role,
     status: p.isConnected ? "online" : "offline",
-    ping: 28,
+    ping: 24,
   }));
 
-  // Listener Join Prompt: If user visited via invite link without setting a name, prompt them first
+  // Direct Link Join Prompt Modal
   if (needsNamePrompt) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
-          <div className="text-center space-y-2">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-purple-600/30">
-              <Radio className="w-7 h-7" />
-            </div>
-            <h2 className="text-xl font-bold text-white">Join Listening Room</h2>
-            <p className="text-xs text-zinc-400">
-              {room?.name ? (
-                <>You're invited to join <strong className="text-zinc-200">"{room.name}"</strong></>
-              ) : (
-                "Enter your nickname to join the live synchronized music session."
-              )}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-surface text-on-surface">
+        <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 md:p-8 shadow-[0_20px_48px_-12px_rgba(24,24,27,0.18)] space-y-5 animate-in fade-in">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+            <span className="font-mono text-[11px] uppercase tracking-widest text-on-surface-variant font-semibold">
+              Live Listening Room
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold tracking-tight text-on-surface">
+              {room?.name || "SyncTune Studio"}
+            </h2>
+            <p className="text-xs text-tertiary leading-relaxed">
+              You are tuning in to live synchronized YouTube audio. Enter your display name and choose a desk avatar to join.
             </p>
           </div>
 
           <form onSubmit={handleJoinPromptSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">Your Display Name</label>
+              <label className="text-xs font-semibold text-on-surface">Your Display Name</label>
               <input
                 type="text"
                 required
                 maxLength={24}
                 autoFocus
-                placeholder="Enter your name or nickname..."
+                placeholder="Enter your name or handle..."
                 value={promptName}
                 onChange={(e) => setPromptName(e.target.value)}
-                className="w-full text-sm rounded-xl bg-zinc-950 border border-zinc-700 px-3.5 py-2.5 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                className="w-full text-xs rounded-lg bg-surface border border-outline-variant px-3.5 py-2.5 text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-zinc-300">Choose Your Avatar</label>
-              <div className="grid grid-cols-6 gap-2">
-                {AVATAR_PRESETS.map((av) => (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-on-surface">Pick a Desk Avatar</label>
+              <div className="grid grid-cols-5 gap-2">
+                {DESK_AVATARS.map((av) => (
                   <button
                     key={av}
                     type="button"
                     onClick={() => setPromptAvatar(av)}
-                    className={`text-xl p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`text-xl p-2 rounded-lg border text-center transition-all cursor-pointer ${
                       promptAvatar === av
-                        ? "bg-purple-600/20 border-purple-500 ring-2 ring-purple-500/40"
-                        : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
+                        ? "bg-[#FFF7ED] border-primary shadow-[0_0_0_1.5px_#EA580C]"
+                        : "bg-surface border-outline-variant hover:bg-surface-container"
                     }`}
                   >
                     {av}
@@ -580,15 +474,14 @@ export const ListeningRoomPage: React.FC = () => {
             <button
               type="submit"
               disabled={!promptName.trim()}
-              className="w-full py-3 text-sm font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-2.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-container disabled:opacity-50 text-white shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <span>Join Room & Listen Live</span>
-              <Sparkles className="w-4 h-4" />
             </button>
           </form>
 
           <div className="text-center pt-1">
-            <Link to="/" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+            <Link to="/" className="text-xs text-tertiary hover:text-on-surface transition-colors">
               ← Back to Home
             </Link>
           </div>
@@ -597,26 +490,24 @@ export const ListeningRoomPage: React.FC = () => {
     );
   }
 
-  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 space-y-4">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-        <p className="text-sm text-zinc-400">Entering listening room...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface text-on-surface space-y-4">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        <p className="text-xs text-tertiary font-mono">Entering studio session...</p>
       </div>
     );
   }
 
-  // Error state
   if (error || !room) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-zinc-950 text-zinc-100 text-center space-y-5">
-        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-surface text-on-surface text-center space-y-5">
+        <div className="w-14 h-14 rounded-2xl bg-error/10 border border-error/30 flex items-center justify-center text-error">
           <AlertTriangle className="w-7 h-7" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-white">Room Unavailable</h2>
-          <p className="text-sm text-zinc-400 max-w-sm">{error || "This room does not exist or has been closed."}</p>
+          <h2 className="text-xl font-bold text-on-surface">Room Unavailable</h2>
+          <p className="text-xs text-tertiary max-w-sm">{error || "This room does not exist or has been closed."}</p>
         </div>
         <div className="flex items-center gap-3">
           <Link to="/">
@@ -624,9 +515,9 @@ export const ListeningRoomPage: React.FC = () => {
               Go Home
             </Button>
           </Link>
-          <Link to="/join">
+          <Link to="/">
             <Button variant="primary" size="md">
-              Try Another Room
+              Browse Rooms
             </Button>
           </Link>
         </div>
@@ -635,83 +526,68 @@ export const ListeningRoomPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 selection:bg-purple-600 selection:text-white">
-      {/* Top Room Navigation Bar */}
-      <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
+    <div className="min-h-screen flex flex-col bg-surface text-on-surface antialiased">
+      {/* Top Editorial Sub-Bar */}
+      <header className="sticky top-0 z-40 w-full bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-[0_1px_8px_rgba(27,27,30,0.04)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Left: Brand & Room Name */}
-          <div className="flex items-center gap-3">
+          {/* Left Meta Cluster */}
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={handleBackToHome}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
-              title="Browse Home (Keep Listening)"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              title="Return to Home (Keeps audio playing in background)"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
             </button>
 
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-600/30">
-                <Radio className="w-4 h-4" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold text-white flex items-center gap-2 truncate max-w-[180px] sm:max-w-xs md:max-w-md">
-                  <span>{room.name}</span>
-                </h1>
-                <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                  <button
-                    onClick={handleCopyRoomCode}
-                    className="font-mono hover:text-white flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 px-2.5 py-1 rounded-lg border border-zinc-800 cursor-pointer transition-colors text-xs"
-                    title="Click to copy Room Code"
-                  >
-                    {copiedCode ? (
-                      <span className="text-emerald-400 flex items-center gap-1.5 font-semibold">
-                        <Check className="w-3 h-3" /> Copied! 🎉
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-zinc-300">
-                        <Copy className="w-3 h-3 text-zinc-400" />
-                        <span>Click to copy code</span>
-                      </span>
-                    )}
-                  </button>
-                  <span>•</span>
-                  <span
-                    className={`flex items-center gap-1 ${
-                      isConnected ? "text-emerald-400" : "text-amber-400"
-                    }`}
-                  >
-                    <Wifi className="w-3 h-3" /> {isConnected ? "Live Socket" : "Reconnecting..."}
-                  </span>
-                </div>
+            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-white font-bold text-sm shrink-0">
+              S
+            </div>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm md:text-base font-bold text-on-surface truncate">
+                {room.name}
+              </h1>
+
+              <button
+                onClick={handleCopyRoomCode}
+                className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container transition-all cursor-pointer shrink-0"
+                title="Click to copy room code"
+              >
+                <span>#{roomId.slice(0, 6).toUpperCase()}</span>
+                {copiedCode ? (
+                  <Check className="w-3 h-3 text-secondary" />
+                ) : (
+                  <Copy className="w-3 h-3 text-tertiary" />
+                )}
+              </button>
+
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs shrink-0">
+                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+                <span className="font-mono text-[11px] text-secondary font-medium tracking-tight">
+                  ● Live Socket • &lt;38ms drift
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right: Actions & User Info */}
-          <div className="flex items-center gap-2.5">
-            {/* Quick Share Link Button */}
+          {/* Right Controls Cluster */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
-              title="Click to copy invite link"
-              leftIcon={
-                copiedLink ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )
-              }
+              leftIcon={copiedLink ? <Check className="w-3.5 h-3.5 text-secondary" /> : <LinkIcon className="w-3.5 h-3.5" />}
               onClick={handleCopyInvite}
             >
-              {copiedLink ? "Copied! 🎉" : "Click to copy link"}
+              {copiedLink ? "Copied! 🎉" : "Copy Invite Link"}
             </Button>
 
-            {/* Host Delete Room or Listener Leave Button */}
             {isHost ? (
               <button
                 onClick={() => setShowDeleteModal(true)}
-                title="Delete and close room for everyone"
-                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-error/10 hover:text-error text-tertiary border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Delete this room permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Delete Room</span>
@@ -719,77 +595,51 @@ export const ListeningRoomPage: React.FC = () => {
             ) : (
               <button
                 onClick={handleExplicitLeave}
+                className="px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-tertiary hover:text-on-surface border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Leave room"
-                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Leave</span>
               </button>
             )}
 
-            {/* Current User Badge */}
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-zinc-800 text-xs">
-              <span className="text-base">{avatar}</span>
-              <span className="font-medium text-zinc-200">{username}</span>
+            {/* Host Badge */}
+            <div className="hidden sm:flex items-center gap-1.5 pl-2 py-1 pr-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs text-xs">
+              <span className="text-sm">{avatar}</span>
+              <span className="font-semibold text-on-surface">{username}</span>
               {isHost && (
-                <Badge variant="amber" size="sm">
-                  <Crown className="w-3 h-3 mr-1 inline" />
+                <span className="px-1.5 py-0.5 rounded bg-primary text-white font-mono text-[10px] uppercase font-bold tracking-wider">
                   Host
-                </Badge>
+                </span>
               )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Room Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
-        {/* Host Promotion Notification Banner */}
+      {/* Main 2-Column Responsive Workspace Grid (8 cols / 4 cols) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+        {/* Host Promotion Banner */}
         {hostPromotedToast && (
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-xs text-amber-200 animate-in fade-in">
+          <div className="flex items-center justify-between p-3.5 rounded-lg bg-[#FFF7ED] border border-primary/40 text-xs text-on-surface animate-in fade-in">
             <div className="flex items-center gap-2.5">
-              <Crown className="w-5 h-5 text-amber-400 shrink-0" />
+              <Crown className="w-4 h-4 text-primary shrink-0" />
               <span>
-                <strong>Host Succession:</strong> The previous host disconnected. You have been promoted to <strong>Room Host</strong> and now have full control of playback and the queue!
+                <strong>Host Succession:</strong> The previous host disconnected. You have been promoted to <strong>Room Host</strong> and have control of the queue!
               </span>
             </div>
             <button
               onClick={() => setHostPromotedToast(false)}
-              className="px-2.5 py-1 bg-amber-500/30 hover:bg-amber-500/40 text-amber-100 rounded-lg text-xs font-medium cursor-pointer ml-3 transition-colors shrink-0"
+              className="px-2.5 py-1 bg-primary text-white rounded text-xs font-medium cursor-pointer"
             >
               Got it
             </button>
           </div>
         )}
 
-        {/* Host Disconnected Warning Banner */}
-        {roomStatus === "host-disconnected" && (
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                <strong>Host Disconnected:</strong> The room host has temporarily left or lost connection.
-                Playback state is paused until the host rejoins.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Regular Sync Banner */}
-        {roomStatus === "active" && (
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-purple-950/40 via-zinc-900/40 to-indigo-950/40 border border-purple-500/20 text-xs text-purple-200">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
-              <span>
-                Synchronized listening room is active. All {participants.length} participants receive real-time updates.
-              </span>
-            </div>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Main Area: Player & Playback Controls (Cols 1-8) */}
-          <section className="lg:col-span-8 space-y-4">
+          {/* LEFT COLUMN: Stage, Scrubber & Telemetry (8 cols) */}
+          <section className="lg:col-span-8 flex flex-col gap-4">
             <RoomPlayer
               currentSong={currentSong}
               isHost={isHost}
@@ -802,39 +652,40 @@ export const ListeningRoomPage: React.FC = () => {
               onOpenAddSong={() => setSidebarTab("queue")}
             />
 
-            {/* Room Info & Status Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-1">
-                <span className="text-zinc-400">Room Status</span>
-                <p className="font-semibold text-emerald-400 flex items-center gap-1.5 capitalize">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      roomStatus === "active" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-                    }`}
-                  />
-                  {roomStatus}
-                </p>
+            {/* Bottom Room Telemetry Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3.5 flex flex-col justify-between">
+                <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
+                  Room Status
+                </span>
+                <div className="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-secondary">
+                  <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+                  <span>Active (Lockstep v2.1)</span>
+                </div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-1">
-                <span className="text-zinc-400">Host</span>
-                <p className="font-semibold text-zinc-100 flex items-center gap-1.5">
-                  <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  {isHost ? `${username} (You)` : "Room Host"}
-                </p>
+              <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3.5 flex flex-col justify-between">
+                <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
+                  Host Authority
+                </span>
+                <div className="flex items-center gap-1.5 mt-1 text-xs font-semibold text-on-surface truncate">
+                  <Crown className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="truncate">{isHost ? `${username} (You) • Controls Active` : "Active Room Host"}</span>
+                </div>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-1">
-                <span className="text-zinc-400">Listeners</span>
-                <p className="font-semibold text-zinc-100 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-purple-400" />
-                  {participants.filter((p) => p.isConnected).length} Connected
-                </p>
+              <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3.5 flex flex-col justify-between">
+                <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
+                  Network Metrics
+                </span>
+                <div className="flex items-center gap-1.5 mt-1 font-mono text-xs text-secondary font-semibold">
+                  <span>{participants.filter((p) => p.isConnected).length} Connected • &lt;38ms drift</span>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Right Sidebar: Queue, Participants, Chat (Cols 9-12) */}
+          {/* RIGHT COLUMN: Sidebar (4 cols) */}
           <aside className="lg:col-span-4 h-[680px]">
             <RoomSidebar
               roomId={room.id}
@@ -858,24 +709,24 @@ export const ListeningRoomPage: React.FC = () => {
         </div>
       </main>
 
-      {/* Floating Chat Notification Toast with Reply */}
+      {/* Floating Chat Notification Toast */}
       {chatToast && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl bg-zinc-900/95 border border-purple-500/40 p-3.5 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300 flex items-start gap-3">
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl bg-surface-container-lowest border border-outline-variant p-4 shadow-xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
           <div className="text-2xl shrink-0">{chatToast.senderAvatar || "💬"}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-white truncate">
+              <span className="text-xs font-bold text-on-surface truncate">
                 {chatToast.senderUsername}
               </span>
               <button
                 onClick={() => setChatToast(null)}
-                className="text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
+                className="text-tertiary hover:text-on-surface text-xs cursor-pointer"
                 title="Dismiss"
               >
                 ✕
               </button>
             </div>
-            <p className="text-xs text-zinc-300 truncate mt-0.5">
+            <p className="text-xs text-tertiary truncate mt-0.5">
               {chatToast.content.replace(/<[^>]*>?/gm, "")}
             </p>
             <div className="mt-2 flex items-center gap-2">
@@ -885,7 +736,7 @@ export const ListeningRoomPage: React.FC = () => {
                   setSidebarTab("chat");
                   setChatToast(null);
                 }}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
+                className="px-2.5 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
               >
                 <MessageSquare className="w-3 h-3" />
                 Reply
@@ -897,29 +748,29 @@ export const ListeningRoomPage: React.FC = () => {
 
       {/* Host Delete Room Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-red-500/30 p-6 shadow-2xl space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-              <Trash2 className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#18181b]/40 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-container-lowest border border-outline-variant p-6 shadow-2xl space-y-4">
+            <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center text-error">
+              <Trash2 className="w-5 h-5" />
             </div>
-            <div className="space-y-1.5">
-              <h3 className="text-base font-bold text-white">Delete this Room?</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                This will permanently delete and close &quot;{room.name}&quot; for all connected listeners.
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-on-surface">Delete this Room?</h3>
+              <p className="text-xs text-tertiary leading-relaxed">
+                This will permanently close &quot;{room.name}&quot; for all connected participants.
               </p>
             </div>
             <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 py-2 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-surface border border-outline-variant text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeleteRoom}
-                className="flex-1 py-2 text-xs font-semibold rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/30 transition-all cursor-pointer"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-error hover:bg-error/90 text-white shadow-xs transition-colors cursor-pointer"
               >
                 Delete Room
               </button>

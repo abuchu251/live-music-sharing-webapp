@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Sparkles, Music, User, Globe, Lock } from "lucide-react";
+import { Music, User, Globe, Lock, Check } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -12,22 +12,30 @@ export interface CreateRoomModalProps {
   onClose: () => void;
 }
 
-const AVATAR_PRESETS = [
-  "🎧", "🎵", "🎸", "🎹", "🎷", "🎺", "🥁", "🎤", "👾", "✨"
+const DESK_AVATARS = [
+  { id: "headphones", icon: "🎧", label: "Headphones" },
+  { id: "note", icon: "🎵", label: "Music Note" },
+  { id: "guitar", icon: "🎸", label: "Acoustic Guitar" },
+  { id: "piano", icon: "🎹", label: "Piano Keys" },
+  { id: "sax", icon: "🎷", label: "Saxophone" },
+  { id: "vinyl", icon: "💿", label: "Vinyl Record" },
+  { id: "radio", icon: "📻", label: "Analog Radio" },
+  { id: "mic", icon: "🎤", label: "Microphone" },
+  { id: "synth", icon: "🎛️", label: "Synthesizer" },
+  { id: "coffee", icon: "☕", label: "Desk Coffee" },
 ];
 
 export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [roomName, setRoomName] = useState("");
-  const [username, setUsername] = useState(user?.username || "");
-  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || AVATAR_PRESETS[0] || "🎧");
+  const [roomName, setRoomName] = useState("Afternoon Office Beats");
+  const [username, setUsername] = useState(user?.username || localStorage.getItem("synctune:pref:username") || "");
+  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || localStorage.getItem("synctune:pref:avatar") || "🎧");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync with auth user changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (user?.username && !username) {
       setUsername(user.username);
     }
@@ -57,7 +65,6 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
         avatar: selectedAvatar,
       });
 
-      // Save credentials for host session in sessionStorage and user preferences
       sessionStorage.setItem(`synctune:participantId:${response.room.id}`, response.participantId);
       sessionStorage.setItem(`synctune:username:${response.room.id}`, username.trim());
       sessionStorage.setItem(`synctune:avatar:${response.room.id}`, selectedAvatar);
@@ -85,115 +92,133 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      badge="Host Studio Session"
       title="Create Listening Room"
-      description="You will be the host with playback controls. Invite anyone with your room link."
+      description="You'll control playback. Anyone with your link can tune in."
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && (
-          <div className="p-3 text-xs bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
+          <div className="p-3 text-xs bg-error/10 border border-error/30 text-error rounded-lg font-medium">
             {error}
           </div>
         )}
 
-        <Input
-          label="Room Name"
-          placeholder="e.g. Late Night Lo-Fi Beats"
-          value={roomName}
-          onChange={(e) => {
-            setRoomName(e.target.value);
-            setError(null);
-          }}
-          leftIcon={<Music className="w-4 h-4" />}
-          autoFocus
-          required
-        />
+        {/* Room Name */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-on-surface">Room Name</label>
+            <span className="font-mono text-[11px] text-tertiary">Editable anytime</span>
+          </div>
+          <Input
+            value={roomName}
+            onChange={(e) => {
+              setRoomName(e.target.value);
+              setError(null);
+            }}
+            placeholder="e.g. Afternoon Office Beats"
+            leftIcon={<Music className="w-4 h-4 text-tertiary" />}
+            autoFocus
+            required
+          />
+        </div>
 
-        <Input
-          label="Your Display Name"
-          placeholder="e.g. Alex"
-          value={username}
-          onChange={(e) => {
-            setUsername(e.target.value);
-            setError(null);
-          }}
-          leftIcon={<User className="w-4 h-4" />}
-          required
-        />
+        {/* Display Name */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-on-surface">Your Display Name</label>
+          <Input
+            value={username}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              setError(null);
+            }}
+            placeholder="Your name or handle"
+            leftIcon={<User className="w-4 h-4 text-tertiary" />}
+            required
+          />
+        </div>
 
-        {/* Avatar Preset Selector */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-zinc-300">
-            Choose Your Avatar
-          </label>
-          <div className="grid grid-cols-5 gap-2">
-            {AVATAR_PRESETS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                onClick={() => setSelectedAvatar(icon)}
-                className={`h-11 rounded-xl text-xl flex items-center justify-center border transition-all cursor-pointer ${
-                  selectedAvatar === icon
-                    ? "bg-purple-600/30 border-purple-500 text-white shadow-md shadow-purple-600/20 scale-105"
-                    : "bg-zinc-800/60 border-zinc-700/60 hover:border-zinc-500 text-zinc-300"
-                }`}
-              >
-                {icon}
-              </button>
-            ))}
+        {/* 2x5 Desk Avatar Grid */}
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-semibold text-on-surface">Pick a Desk Avatar</span>
+            <span className="text-[11px] text-tertiary">(shows beside your queue tracks)</span>
+          </div>
+
+          <div className="grid grid-cols-5 gap-2" role="radiogroup">
+            {DESK_AVATARS.map((item) => {
+              const isSelected = selectedAvatar === item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedAvatar(item.icon)}
+                  className={`relative flex flex-col items-center justify-center h-13 rounded-lg border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-[#FFF7ED] border-primary text-primary shadow-[0_0_0_1.5px_#EA580C]"
+                      : "bg-surface border-outline-variant text-tertiary hover:text-on-surface hover:bg-surface-container"
+                  }`}
+                  title={item.label}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  {isSelected && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Room Privacy Option */}
+        {/* Room Privacy */}
         <div className="space-y-1.5 pt-1">
-          <label className="block text-xs font-medium text-zinc-300">
-            Room Privacy
-          </label>
+          <label className="block text-xs font-semibold text-on-surface">Room Privacy</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setIsPrivate(false)}
-              className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+              className={`p-3 rounded-lg border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                 !isPrivate
-                  ? "bg-purple-500/10 border-purple-500/50 text-white"
-                  : "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  ? "bg-[#FFF7ED] border-primary shadow-[0_0_0_1px_#EA580C]"
+                  : "bg-surface border-outline-variant hover:border-tertiary/50"
               }`}
             >
-              <Globe className="w-4 h-4 mt-0.5 text-purple-400 shrink-0" />
+              <Globe className={`w-4 h-4 mt-0.5 shrink-0 ${!isPrivate ? "text-primary" : "text-tertiary"}`} />
               <div>
-                <div className="text-xs font-medium text-zinc-200">Public</div>
-                <div className="text-[11px] text-zinc-400">Listed in demo rooms</div>
+                <div className="text-xs font-semibold text-on-surface">Public Room</div>
+                <div className="text-[11px] text-tertiary">Listed in live rooms</div>
               </div>
             </button>
 
             <button
               type="button"
               onClick={() => setIsPrivate(true)}
-              className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
+              className={`p-3 rounded-lg border text-left flex items-start gap-2.5 transition-all cursor-pointer ${
                 isPrivate
-                  ? "bg-purple-500/10 border-purple-500/50 text-white"
-                  : "bg-zinc-800/40 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  ? "bg-[#FFF7ED] border-primary shadow-[0_0_0_1px_#EA580C]"
+                  : "bg-surface border-outline-variant hover:border-tertiary/50"
               }`}
             >
-              <Lock className="w-4 h-4 mt-0.5 text-indigo-400 shrink-0" />
+              <Lock className={`w-4 h-4 mt-0.5 shrink-0 ${isPrivate ? "text-primary" : "text-tertiary"}`} />
               <div>
-                <div className="text-xs font-medium text-zinc-200">Unlisted</div>
-                <div className="text-[11px] text-zinc-400">Invite link only</div>
+                <div className="text-xs font-semibold text-on-surface">Unlisted Room</div>
+                <div className="text-[11px] text-tertiary">Invite link only</div>
               </div>
             </button>
           </div>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-2.5">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>
+        <div className="pt-2 flex items-center justify-end gap-2.5">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
           <Button
             type="submit"
             variant="primary"
             isLoading={isLoading}
-            leftIcon={<Sparkles className="w-4 h-4" />}
           >
-            Create & Enter Room
+            Create Listening Room
           </Button>
         </div>
       </form>

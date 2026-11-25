@@ -1,21 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  ListMusic,
-  Users,
-  MessageSquare,
   Copy,
   Check,
   Plus,
   Send,
   Trash2,
   Crown,
-  Share2,
   Play,
   GripVertical,
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
-import { Badge } from "../../components/ui/Badge";
 import type { QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "./mockData";
 
@@ -37,6 +32,8 @@ export interface RoomSidebarProps {
   replyPrefill?: string;
   onClearReplyPrefill?: () => void;
 }
+
+const EMOJI_REACTIONS = ["🔥", "☕", "🎧", "🙌", "💃"];
 
 export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   roomId,
@@ -64,9 +61,12 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   };
 
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [newSongInput, setNewSongInput] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -107,19 +107,15 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
-  const [newSongInput, setNewSongInput] = useState("");
-  const [chatInput, setChatInput] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
-  const chatEndRef = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (replyPrefill) {
       setChatInput(replyPrefill);
       if (onClearReplyPrefill) onClearReplyPrefill();
     }
   }, [replyPrefill, onClearReplyPrefill]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeTab === "chat") {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
@@ -134,416 +130,370 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
     });
   };
 
-  const handleCopyLink = () => {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/room/${roomId}` : roomId;
-    copyToClipboard(url).then((ok) => {
-      if (ok) {
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2000);
-      }
-    });
-  };
-
   const handleAddSongSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const rawInput = newSongInput.trim();
     if (!rawInput) return;
 
-    const extractedId = extractYouTubeVideoId(rawInput);
-    const videoId = extractedId || "jfKfPfyJRdk";
-    const title = extractedId ? `YouTube Track (${extractedId})` : rawInput;
+    const extracted = extractYouTubeVideoId(rawInput);
+    if (extracted) {
+      onAddSong(`YouTube Track (${extracted})`, extracted);
+    } else {
+      // Direct YouTube search fallback ID
+      onAddSong(rawInput, "jfKfPfyJRdk");
+    }
 
-    onAddSong(title, videoId);
     setNewSongInput("");
     setShowAddForm(false);
   };
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
     onSendMessage(chatInput.trim());
     setChatInput("");
   };
 
-  return (
-    <div className="w-full h-full flex flex-col rounded-3xl bg-zinc-900/90 border border-zinc-800 shadow-xl overflow-hidden backdrop-blur-md">
-      {/* Room Header Info */}
-      <div className="p-4 border-b border-zinc-800 space-y-3 bg-zinc-950/40">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-0.5 min-w-0 flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
-              Listening Room
-            </span>
-            <h3 className="text-base font-bold text-white truncate">
-              {roomName}
-            </h3>
-          </div>
+  const handleEmojiClick = (emoji: string) => {
+    onSendMessage(emoji);
+  };
 
+  const formatSeconds = (secs: number) => {
+    if (!secs) return "03:30";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="w-full h-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-4 flex flex-col gap-3">
+      {/* Sidebar Header */}
+      <div className="flex flex-col gap-0.5 pb-2 bg-surface-container-low p-3 rounded-lg border border-outline-variant/60">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-tertiary font-bold">
+          LISTENING ROOM
+        </span>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-on-surface truncate pr-2">
+            {roomName}
+          </h3>
           <button
             onClick={handleCopyRoomCode}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-mono border flex items-center gap-1.5 transition-all cursor-pointer ${
-              copiedCode
-                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-semibold"
-                : "bg-zinc-800/80 hover:bg-zinc-700 border-zinc-700/80 text-zinc-300 hover:text-white"
-            }`}
-            title="Click to copy Room Code"
+            className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold transition-all cursor-pointer border border-outline-variant/60"
+            title="Click to copy room code"
+            type="button"
           >
+            <span>#{roomId.slice(0, 6).toUpperCase()}</span>
             {copiedCode ? (
-              <>
-                <Check className="w-3 h-3 text-emerald-400" />
-                <span>Copied! 🎉</span>
-              </>
+              <Check className="w-3 h-3 text-secondary" />
             ) : (
-              <>
-                <Copy className="w-3 h-3 text-zinc-400" />
-                <span className="max-w-[120px] truncate">Click to copy</span>
-              </>
+              <Copy className="w-3 h-3 text-tertiary" />
             )}
-          </button>
-        </div>
-
-        {/* Tab Switcher */}
-        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-medium">
-          <button
-            onClick={() => setActiveTab("queue")}
-            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === "queue"
-                ? "bg-purple-600 text-white shadow-sm font-semibold"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <ListMusic className="w-3.5 h-3.5" />
-            <span>Queue ({queue.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("participants")}
-            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === "participants"
-                ? "bg-purple-600 text-white shadow-sm font-semibold"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>People ({participants.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("chat")}
-            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              activeTab === "chat"
-                ? "bg-purple-600 text-white shadow-sm font-semibold"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Chat</span>
           </button>
         </div>
       </div>
 
-      {/* Tab 1: Queue Content */}
+      {/* Segmented Tab Switcher */}
+      <div className="grid grid-cols-3 p-1 rounded-lg bg-surface-container gap-1 text-xs text-center font-medium">
+        <button
+          onClick={() => setActiveTab("queue")}
+          className={`py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === "queue"
+              ? "bg-surface-container-lowest font-semibold text-on-surface shadow-xs"
+              : "text-tertiary hover:text-on-surface hover:bg-surface-container-high"
+          }`}
+          type="button"
+        >
+          <span>Queue</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+          <span className="font-mono text-[11px] text-tertiary">{queue.length}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("participants")}
+          className={`py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+            activeTab === "participants"
+              ? "bg-surface-container-lowest font-semibold text-on-surface shadow-xs"
+              : "text-tertiary hover:text-on-surface hover:bg-surface-container-high"
+          }`}
+          type="button"
+        >
+          <span>People</span>
+          <span className="font-mono text-[11px]">{participants.filter((p) => p.status === "online").length}</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("chat")}
+          className={`py-1.5 px-2 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
+            activeTab === "chat"
+              ? "bg-surface-container-lowest font-semibold text-on-surface shadow-xs"
+              : "text-tertiary hover:text-on-surface hover:bg-surface-container-high"
+          }`}
+          type="button"
+        >
+          <span>Chat</span>
+          <span className="font-mono text-[11px]">{chatMessages.length}</span>
+        </button>
+      </div>
+
+      {/* TAB CONTENT: QUEUE */}
       {activeTab === "queue" && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-              Upcoming Tracks
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline-variant/60">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-tertiary font-bold">
+              Upcoming Tracks ({queue.length})
             </span>
             <button
               onClick={() => setShowAddForm((prev) => !prev)}
-              className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors cursor-pointer"
+              type="button"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{showAddForm ? "Cancel" : "Add Song"}</span>
+              <Plus className="w-3.5 h-3.5 text-primary" />
+              <span>Add Song</span>
             </button>
           </div>
 
-          {/* Add Song Form */}
+          {/* Add Song Form Drawer */}
           {showAddForm && (
-            <form
-              onSubmit={handleAddSongSubmit}
-              className="p-3 rounded-2xl bg-zinc-950 border border-purple-500/30 space-y-2.5 animate-in fade-in"
-            >
+            <form onSubmit={handleAddSongSubmit} className="mb-2 p-2.5 rounded-lg bg-surface-container-low border border-outline-variant flex flex-col gap-2 animate-in fade-in">
               <input
                 type="text"
-                placeholder="Paste YouTube URL or song name..."
+                placeholder="Paste YouTube link or enter song title..."
                 value={newSongInput}
                 onChange={(e) => setNewSongInput(e.target.value)}
-                className="w-full text-xs rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                className="w-full text-xs px-2.5 py-1.5 rounded bg-surface-container-lowest border border-outline-variant text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary"
                 autoFocus
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex items-center justify-end gap-1.5">
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="px-2.5 py-1 text-xs text-tertiary hover:text-on-surface cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1 text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow-sm cursor-pointer"
+                  className="px-3 py-1 text-xs font-semibold bg-primary hover:bg-primary-container text-white rounded cursor-pointer"
                 >
-                  Queue Song
+                  Add to Queue
                 </button>
               </div>
             </form>
           )}
 
-          {/* Queue Items */}
-          <div className="space-y-2">
-            {queue.map((song, index) => (
-              <div
-                key={song.id}
-                draggable={isHost}
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-                className={`group relative flex items-center gap-2.5 p-2.5 rounded-2xl border transition-all ${
-                  draggedIndex === index
-                    ? "opacity-40 scale-[0.98] border-purple-500 bg-purple-500/10"
-                    : dragOverIndex === index
-                    ? "border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/20"
-                    : "bg-zinc-950/60 hover:bg-zinc-800/60 border-zinc-800/80 hover:border-zinc-700"
-                }`}
-              >
-                {/* Drag handle to the left of the numbering */}
-                <div
-                  className={`p-1 -ml-1 text-zinc-600 group-hover:text-zinc-300 transition-colors ${
-                    isHost ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-40"
-                  }`}
-                  title={isHost ? "Drag to reorder track in queue" : "Only host can reorder queue"}
+          {/* Queue Items Scroll Area */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {queue.length === 0 ? (
+              <div className="h-44 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-surface-container-low border border-dashed border-outline-variant text-tertiary">
+                <p className="text-xs font-medium text-on-surface mb-1">Queue is empty</p>
+                <p className="text-[11px] text-tertiary max-w-[200px]">
+                  Add music videos from YouTube so the room has upcoming tracks.
+                </p>
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="mt-3 text-xs font-semibold text-primary hover:underline"
+                  type="button"
                 >
-                  <GripVertical className="w-3.5 h-3.5" />
-                </div>
-
-                <span className="w-5 text-center text-xs font-mono text-zinc-400 font-semibold select-none">
-                  {index + 1}
-                </span>
-
-                <img
-                  src={song.thumbnailUrl}
-                  alt={song.title}
-                  className="w-11 h-11 rounded-xl object-cover shrink-0"
-                />
-
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-semibold text-zinc-100 truncate group-hover:text-purple-300 transition-colors">
-                    {song.title}
-                  </h4>
-                  <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                    <span className="truncate">{song.artist}</span>
-                    <span>•</span>
-                    <span>{Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, "0")}</span>
-                  </div>
-                </div>
-
-                {(isHost || song.addedBy?.username === currentUser.username) && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {isHost && onPlaySong && (
-                      <button
-                        onClick={() => onPlaySong(song, index)}
-                        className="p-1.5 text-zinc-400 hover:text-emerald-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
-                        title="Play this track now"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                      </button>
+                  + Add First Song
+                </button>
+              </div>
+            ) : (
+              queue.map((song, index) => {
+                const isFirstPlaying = index === 0;
+                return (
+                  <div
+                    key={song.id}
+                    draggable={isHost}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className={`relative p-2.5 rounded-lg border transition-all flex items-center justify-between gap-2.5 group ${
+                      isFirstPlaying
+                        ? "bg-[#FFF7ED] border-primary/50 shadow-xs"
+                        : draggedIndex === index
+                        ? "opacity-40 scale-[0.98] border-primary bg-primary/10"
+                        : dragOverIndex === index
+                        ? "border-primary bg-primary/20 shadow-md"
+                        : "bg-surface-container-low hover:bg-surface-container border-outline-variant/60"
+                    }`}
+                  >
+                    {isFirstPlaying && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l" />
                     )}
-                    <button
-                      onClick={() => onRemoveSong(song.id)}
-                      className="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer"
-                      title="Remove from queue"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
 
-            {queue.length === 0 && (
-              <div className="py-8 text-center text-zinc-500 text-xs">
-                Queue is empty. Click "+ Add Song" to queue the next track!
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Participants Content */}
-      {activeTab === "participants" && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-              Connected Listeners ({participants.length})
-            </span>
-            <Badge variant="emerald" size="sm" dot>
-              Live Sync
-            </Badge>
-          </div>
-
-          <div className="space-y-2">
-            {participants.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-xl">{p.avatar}</div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium text-zinc-100">
-                        {p.username}
-                      </span>
-                      {p.username === currentUser.username && (
-                        <span className="text-[10px] text-purple-400 font-mono">(you)</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          p.status === "online"
-                            ? "bg-emerald-400"
-                            : p.status === "buffering"
-                            ? "bg-amber-400 animate-pulse"
-                            : "bg-zinc-500"
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {/* Drag Handle to the left of numbering */}
+                      <div
+                        className={`p-0.5 text-tertiary group-hover:text-on-surface transition-colors ${
+                          isHost ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-40"
                         }`}
-                      />
-                      <span>{p.status}</span>
-                      <span>•</span>
-                      <span className="font-mono text-zinc-500">{p.ping}ms</span>
+                        title={isHost ? "Drag to reorder track" : "Only host can reorder"}
+                      >
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </div>
+
+                      <span className="w-4 text-center text-xs font-mono font-semibold text-tertiary shrink-0">
+                        {index + 1}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold truncate ${isFirstPlaying ? "text-primary" : "text-on-surface"}`}>
+                          {song.title}
+                        </p>
+                        <p className="font-mono text-[10px] text-tertiary truncate">
+                          Added by @{song.addedBy?.username || "Listener"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-mono text-xs text-tertiary">
+                        {formatSeconds(song.duration || 210)}
+                      </span>
+
+                      {isHost && onPlaySong && (
+                        <button
+                          onClick={() => onPlaySong(song, index)}
+                          className="p-1 text-tertiary hover:text-primary transition-colors cursor-pointer"
+                          title="Play this song now"
+                          type="button"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => onRemoveSong(song.id)}
+                        className="p-1 text-tertiary hover:text-error transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                        title="Remove song"
+                        type="button"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                {p.role === "HOST" ? (
-                  <Badge variant="amber" size="sm">
-                    <Crown className="w-3 h-3 mr-1 inline text-amber-400" />
-                    Host
-                  </Badge>
-                ) : (
-                  <Badge variant="zinc" size="sm">
-                    Listener
-                  </Badge>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Quick Invite Box */}
-          <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center space-y-2">
-            <Share2 className="w-5 h-5 text-purple-400 mx-auto" />
-            <h5 className="text-xs font-semibold text-purple-200">
-              Invite friends to this room
-            </h5>
-            <p className="text-[11px] text-purple-300/80">
-              Anyone with this link can watch and listen in exact synchronization.
-            </p>
-            <button
-              onClick={handleCopyLink}
-              title="Click to copy room link"
-              className="w-full py-1.5 text-xs font-medium rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              {copiedLink ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Copied! 🎉</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Click to copy link</span>
-                </>
-              )}
-            </button>
+                );
+              })
+            )}
           </div>
         </div>
       )}
 
-      {/* Tab 3: Chat Content */}
-      {activeTab === "chat" && (
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {chatMessages.map((msg) => {
-              const formattedTime =
-                typeof msg.timestamp === "number"
-                  ? new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                  : msg.timestamp;
-
-              return (
-                <div key={msg.id} className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm">{msg.senderAvatar}</span>
-                    <span className="text-xs font-semibold text-zinc-200">
-                      {msg.senderUsername}
-                    </span>
-                    {msg.isHost && (
-                      <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.2 rounded font-medium">
-                        Host
-                      </span>
-                    )}
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      {formattedTime}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setChatInput(`@${msg.senderUsername} `)}
-                      className="text-[10px] text-zinc-500 hover:text-purple-400 cursor-pointer ml-auto transition-colors"
-                    >
-                      Reply
-                    </button>
-                  </div>
-                  <p
-                    className="text-xs text-zinc-300 pl-6 leading-relaxed bg-zinc-950/40 p-2 rounded-xl border border-zinc-800/50 break-words"
-                    dangerouslySetInnerHTML={{ __html: msg.content }}
-                  />
-                </div>
-              );
-            })}
-
-            {chatMessages.length === 0 && (
-              <div className="py-12 text-center text-zinc-500 text-xs">
-                No chat messages yet. Say hello to everyone! 👋
-              </div>
-            )}
-            <div ref={chatEndRef} />
+      {/* TAB CONTENT: PARTICIPANTS */}
+      {activeTab === "participants" && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline-variant/60">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-tertiary font-bold">
+              Connected Coworkers ({participants.filter((p) => p.status === "online").length})
+            </span>
+            <span className="font-mono text-[11px] text-secondary font-semibold">
+              All Synced
+            </span>
           </div>
 
-          {/* Quick Reactions Bar */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-zinc-800/80 bg-zinc-950/70 overflow-x-auto">
-            <span className="text-[10px] text-zinc-500 font-medium">React:</span>
-            {["🔥", "❤️", "🎵", "👏", "⚡", "🚀", "🎉"].map((emoji) => (
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {participants.map((person) => (
+              <div
+                key={person.id}
+                className="p-2.5 rounded-lg bg-surface-container-low border border-outline-variant/60 flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center text-sm shrink-0">
+                    {person.avatar || "🎧"}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-on-surface truncate flex items-center gap-1.5">
+                      <span>{person.username}</span>
+                      {person.role === "HOST" && (
+                        <Crown className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />
+                      )}
+                    </p>
+                    <p className="font-mono text-[10px] text-tertiary">
+                      {person.role === "HOST" ? "Studio Host" : "Listener"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                  <span className="font-mono text-[11px] text-secondary font-semibold">
+                    {person.ping ? `${person.ping}ms` : "24ms"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: CHAT */}
+      {activeTab === "chat" && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Quick Reaction Strip */}
+          <div className="flex items-center justify-between gap-1 pb-2 mb-2 border-b border-outline-variant/60">
+            {EMOJI_REACTIONS.map((emoji) => (
               <button
                 key={emoji}
+                onClick={() => handleEmojiClick(emoji)}
+                className="flex-1 py-1 rounded bg-surface-container hover:bg-surface-container-high hover:scale-105 active:scale-95 text-sm transition-all cursor-pointer"
                 type="button"
-                onClick={() => onSendMessage(emoji)}
-                className="text-xs px-1.5 py-0.5 rounded-lg hover:bg-zinc-800 transition-all cursor-pointer active:scale-125"
-                title={`React ${emoji}`}
               >
                 {emoji}
               </button>
             ))}
           </div>
 
-          {/* Chat Input Bar */}
-          <form
-            onSubmit={handleSendChat}
-            className="p-3 border-t border-zinc-800 bg-zinc-950/60 flex items-center gap-2"
-          >
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+            {chatMessages.length === 0 ? (
+              <div className="h-32 flex flex-col items-center justify-center text-center p-3 text-tertiary text-xs">
+                <p>No messages yet.</p>
+                <p className="text-[11px]">Send a note or react with an emoji!</p>
+              </div>
+            ) : (
+              chatMessages.map((msg) => {
+                const isMe = msg.senderUsername === currentUser.username;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col text-xs ${isMe ? "items-end" : "items-start"}`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5 text-tertiary text-[11px]">
+                      <span>{msg.senderAvatar || "💬"}</span>
+                      <span className="font-semibold text-on-surface">{msg.senderUsername}</span>
+                      <span className="font-mono text-[10px]">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div
+                      className={`px-3 py-1.5 rounded-lg max-w-[85%] break-words ${
+                        isMe
+                          ? "bg-primary text-white"
+                          : "bg-surface-container border border-outline-variant/60 text-on-surface"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input Form */}
+          <form onSubmit={handleChatSubmit} className="pt-2 flex items-center gap-1.5 border-t border-outline-variant/60">
             <input
               type="text"
-              placeholder="Send a message to the room..."
+              placeholder="Send message or drop YouTube link..."
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              maxLength={200}
-              className="flex-1 text-xs rounded-xl bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+              className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-surface border border-outline-variant text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
             />
             <button
               type="submit"
-              disabled={!chatInput.trim()}
-              className="p-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:hover:bg-purple-600 text-white transition-all cursor-pointer"
-              aria-label="Send message"
+              className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center shrink-0 cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
             </button>

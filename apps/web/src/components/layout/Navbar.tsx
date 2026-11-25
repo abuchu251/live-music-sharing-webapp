@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router";
-import { Radio, Plus, LogIn, Code2, LogOut, User as UserIcon } from "lucide-react";
+import { LogIn, LogOut, Code2, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -15,56 +15,65 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
   const { user, logout, openAuthModal } = useAuth();
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-[0_1px_8px_rgba(27,27,30,0.04)]">
+      <div className="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Brand */}
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 group transition-transform active:scale-95"
-        >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-md shadow-purple-600/30 group-hover:shadow-purple-600/50 transition-shadow">
-            <Radio className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+        <div className="flex items-center gap-6">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 group transition-transform active:scale-98"
+          >
+            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-on-primary font-bold text-base shadow-xs group-hover:bg-primary-container transition-colors">
+              S
+            </div>
+            <span className="font-bold text-lg tracking-tight text-on-surface">
               SyncTune
             </span>
-          </div>
-        </Link>
+          </Link>
 
-        {/* Center / Navigation items */}
-        {!isRoomPage && (
-          <nav className="hidden md:flex items-center gap-6 text-sm text-zinc-400">
-            <a
-              href="/#how-it-works"
-              className="hover:text-zinc-100 transition-colors"
-            >
-              How it works
-            </a>
-            <a
-              href="/#features"
-              className="hover:text-zinc-100 transition-colors"
-            >
-              Features
-            </a>
-            <a
-              href="/#preview"
-              className="hover:text-zinc-100 transition-colors"
-            >
-              Live Demo
-            </a>
-          </nav>
-        )}
+          {!isRoomPage && (
+            <nav className="hidden md:flex items-center gap-6 text-sm">
+              <a
+                href="#our-story"
+                className="text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                Our Story
+              </a>
+              <a
+                href="#how-it-works"
+                className="text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                How it Works
+              </a>
+              <a
+                href="#live-rooms"
+                className="text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                Live Rooms
+              </a>
+            </nav>
+          )}
+        </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
+          {/* GitHub Contributor Link */}
+          <a
+            href="https://github.com/abuchu251/live-music-sharing-webapp/issues/new?title=Contributor+Request&body=Hi%2C+I+would+like+to+contribute+to+SyncTune."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 rounded-lg text-tertiary hover:text-on-surface hover:bg-surface-container transition-colors"
+            title="Request to be a Contributor on GitHub"
+          >
+            <Code2 className="w-4 h-4" />
+          </a>
+
           {!isRoomPage ? (
             <>
               {onJoinRoom && (
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  leftIcon={<LogIn className="w-4 h-4" />}
                   onClick={onJoinRoom}
                 >
                   Join Room
@@ -72,18 +81,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
               )}
               {onCreateRoom && (
                 <Button
-                  variant="primary"
+                  variant="dark"
                   size="sm"
                   leftIcon={<Plus className="w-4 h-4" />}
                   onClick={onCreateRoom}
                 >
-                  Create Room
+                  Start a Room
                 </Button>
               )}
             </>
           ) : (
             <Link to="/">
-              <Button variant="ghost" size="sm">
+              <Button variant="secondary" size="sm">
                 Exit Room
               </Button>
             </Link>
@@ -91,52 +100,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
 
           {/* User Auth Status */}
           {user ? (
-            <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
+            <div className="flex items-center gap-2 pl-2 border-l border-outline-variant">
               <div
-                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-container border border-outline-variant text-xs"
                 title={user.email || user.username}
               >
                 <span>{user.avatar || "🎧"}</span>
-                <span className="font-medium text-zinc-200 max-w-[100px] truncate">
+                <span className="font-semibold text-on-surface max-w-[100px] truncate">
                   {user.username}
                 </span>
-                {user.isGuest && (
-                  <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[10px] font-semibold">
-                    Guest
-                  </span>
-                )}
               </div>
               <button
                 onClick={logout}
-                className="p-1.5 text-zinc-400 hover:text-red-400 rounded-lg hover:bg-zinc-800 transition-colors"
+                className="p-1.5 text-tertiary hover:text-error transition-colors cursor-pointer"
                 title="Sign out"
-                aria-label="Sign out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
           ) : (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              leftIcon={<UserIcon className="w-4 h-4" />}
+              leftIcon={<LogIn className="w-4 h-4" />}
               onClick={() => openAuthModal("login")}
             >
               Sign In
             </Button>
           )}
-
-          <a
-            href="https://github.com/abuchu251/live-music-sharing-webapp/issues/new?title=%5BContributor+Request%5D+I%27d+like+to+contribute+to+SyncTune&body=Hi+%40abuchu251%2C%0A%0AI+would+love+to+contribute+to+SyncTune%21%0A%0A%2A%2AWhat+I+would+like+to+help+with%3A%2A%2A+%0A%2A%2AMy+skills%2Fexperience%3A%2A%2A+%0A%2A%2AContact%2FDiscord%3A%2A%2A+"
-            target="_blank"
-            rel="noreferrer"
-            className="p-2 text-zinc-400 hover:text-purple-300 rounded-lg hover:bg-zinc-800/60 transition-colors flex items-center gap-1.5 text-xs font-medium"
-            title="Request to be a Contributor on GitHub"
-            aria-label="Request to be a Contributor on GitHub"
-          >
-            <Code2 className="w-4 h-4 text-purple-400" />
-            <span className="hidden sm:inline text-xs text-zinc-300 hover:text-white">Contribute</span>
-          </a>
         </div>
       </div>
     </header>

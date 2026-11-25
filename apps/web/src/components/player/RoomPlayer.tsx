@@ -8,16 +8,14 @@ import {
   RotateCw,
   Volume2,
   VolumeX,
-  Sparkles,
-  Link as LinkIcon,
-  Radio,
-  Plus,
   Maximize,
   Minimize,
+  Plus,
   Repeat,
+  Radio,
+  Link as LinkIcon,
 } from "lucide-react";
 import { YouTubePlayer, type YouTubePlayerHandle } from "./YouTubePlayer";
-import { Badge } from "../ui/Badge";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { usePlaybackSync } from "../../features/playback/usePlaybackSync";
 import type { SongItem } from "../../features/room/mockData";
@@ -36,9 +34,9 @@ export interface RoomPlayerProps {
 }
 
 const PRESET_TRACKS = [
-  { id: "jfKfPfyJRdk", title: "lofi hip hop radio - beats to relax/study to", artist: "Lofi Girl" },
-  { id: "5qap5aO4i9A", title: "Lofi Hip Hop Radio 24/7 Chill Beats", artist: "ChilledCow" },
-  { id: "DWcJFNfaw9c", title: "Synthwave Radio - Chill Synth / Retro Beats", artist: "Lofi Records" },
+  { id: "jfKfPfyJRdk", title: "☕ lofi hip hop radio" },
+  { id: "5qap5aO4i9A", title: "🌿 Chillhop Beats" },
+  { id: "DWcJFNfaw9c", title: "🌆 Synthwave Radio" },
 ];
 
 export const RoomPlayer: React.FC<RoomPlayerProps> = ({
@@ -100,28 +98,21 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
     initialState: initialPlaybackState,
     onTrackChange: (newVideoId) => {
       if (onChangeVideo) {
-        onChangeVideo(newVideoId, `YouTube Track (${newVideoId})`);
+        onChangeVideo(newVideoId);
       }
     },
   });
 
   const isRoomPlaying = playbackState.status === "playing";
-  const isEffectivelyPlaying = isHost ? isRoomPlaying : (isRoomPlaying && !isLocallyPaused);
-  const activeVideoId = playbackState.videoId || currentSong?.videoId || "jfKfPfyJRdk";
-
-  const formatTime = (seconds: number) => {
-    if (isNaN(seconds) || seconds < 0) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  const isEffectivelyPlaying = isHost ? isRoomPlaying : isRoomPlaying && !isLocallyPaused;
+  const activeVideoId = currentSong?.videoId || playbackState.videoId || "jfKfPfyJRdk";
 
   const handleTogglePlay = () => {
     if (isHost) {
       if (isRoomPlaying) {
-        sendPause(currentTime);
+        sendPause();
       } else {
-        sendPlay(currentTime);
+        sendPlay();
       }
     } else {
       toggleLocalPlayback();
@@ -130,236 +121,232 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isHost) return;
-    const targetSeconds = Number(e.target.value);
-    setCurrentTime(targetSeconds);
-    sendSeek(targetSeconds);
+    const newTime = parseFloat(e.target.value);
+    setCurrentTime(newTime);
+    sendSeek(newTime);
   };
 
-  const handleSkipSeconds = (delta: number) => {
+  const handleSkipSeconds = (deltaSeconds: number) => {
     if (!isHost) return;
-    const nextTime = Math.max(0, Math.min(duration, currentTime + delta));
-    setCurrentTime(nextTime);
-    sendSeek(nextTime);
+    const targetTime = Math.max(0, Math.min(currentTime + deltaSeconds, duration || 9999));
+    setCurrentTime(targetTime);
+    sendSeek(targetTime);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
-    setVolume(val);
-    playerRef.current?.setVolume(val);
-    if (val > 0 && isMuted) {
-      setIsMuted(false);
-      playerRef.current?.unMute();
-    }
+    const newVol = parseInt(e.target.value, 10);
+    setVolume(newVol);
+    if (isMuted && newVol > 0) setIsMuted(false);
+    playerRef.current?.setVolume(newVol);
   };
 
   const handleToggleMute = () => {
-    if (!playerRef.current) return;
     if (isMuted) {
-      playerRef.current.unMute();
       setIsMuted(false);
+      playerRef.current?.unMute();
+      playerRef.current?.setVolume(volume);
     } else {
-      playerRef.current.mute();
       setIsMuted(true);
+      playerRef.current?.mute();
     }
   };
 
   const handleLoadCustomUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    const videoId = extractYouTubeVideoId(customUrlInput);
-    if (!videoId) {
-      setUrlError("Invalid YouTube URL or ID. Please check the link and try again.");
+    if (!isHost) return;
+
+    const extracted = extractYouTubeVideoId(customUrlInput.trim());
+    if (!extracted) {
+      setUrlError("Invalid YouTube URL. Please enter a valid watch or youtu.be link.");
       return;
     }
 
     setUrlError(null);
+    sendChangeVideo(extracted, 0);
+    if (onChangeVideo) {
+      onChangeVideo(extracted);
+    }
     setCustomUrlInput("");
     setShowUrlInput(false);
-
-    if (isHost) {
-      sendChangeVideo(videoId, 0);
-    }
-    if (onChangeVideo) {
-      onChangeVideo(videoId, `YouTube Video (${videoId})`);
-    }
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const formatTime = (secs: number) => {
+    if (!secs || isNaN(secs) || secs < 0) return "00:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
   return (
-    <div className="w-full space-y-4">
-      {/* Real YouTube Player Container */}
-      <div
-        ref={containerRef}
-        className="relative w-full rounded-3xl overflow-hidden bg-zinc-950 border border-zinc-800 shadow-2xl group"
-      >
-        <YouTubePlayer
-          ref={playerRef}
-          videoId={activeVideoId}
-          autoplay={false}
-          controls={false}
-          onTimeUpdate={(curr, dur) => {
-            setCurrentTime(curr);
-            if (dur > 0) setDuration(dur);
-          }}
-          onEnded={() => {
-            if (isHost && onNextTrack && autoPlayQueue) onNextTrack();
-          }}
-        />
-
-        {/* Playlist Completed State Overlay */}
-        {isPlaylistFinished && (
-          <div className="absolute inset-0 bg-zinc-950/92 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 space-y-4 animate-in fade-in">
-            <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-xl shadow-purple-500/10">
-              <Sparkles className="w-8 h-8 text-purple-400" />
-            </div>
-            <div className="space-y-1.5 max-w-sm">
-              <h3 className="text-lg font-bold text-white">Queue Completed 🎉</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                All songs in the playlist have finished. Add more tracks to the queue or replay from the beginning to keep the listening party alive!
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              {isHost && onReplayPlaylist && (
-                <button
-                  type="button"
-                  onClick={onReplayPlaylist}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Replay Queue
-                </button>
-              )}
-              {onOpenAddSong && (
-                <button
-                  type="button"
-                  onClick={onOpenAddSong}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <Plus className="w-3.5 h-3.5 text-purple-400" /> Add Songs
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Top Badges Overlay */}
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
-          <div className="flex items-center gap-2">
-            <Badge
-              variant={
-                isLocallyPaused
-                  ? "purple"
-                  : syncStatus === "in-sync"
-                  ? "emerald"
-                  : syncStatus === "correcting"
-                  ? "amber"
-                  : "purple"
-              }
-              size="sm"
-              dot
-            >
+    <div ref={containerRef} className="flex flex-col gap-3 w-full">
+      {/* 1. Video Stage Container Card */}
+      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs overflow-hidden flex flex-col">
+        {/* Top Status Strip inside Video Frame */}
+        <div className="px-4 py-2 bg-surface-container flex items-center justify-between border-b border-outline-variant">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-secondary font-mono text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
               {isLocallyPaused
                 ? "Locally Paused"
                 : syncStatus === "in-sync"
                 ? isEffectivelyPlaying
-                  ? "Synchronized (Playing)"
-                  : "Synchronized (Paused)"
+                  ? "Synced (Playing)"
+                  : "Synced (Paused)"
                 : syncStatus === "correcting"
                 ? "Re-synchronizing..."
                 : "Buffering"}
-            </Badge>
-
-            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-zinc-300 bg-black/60 px-2 py-0.5 rounded-full border border-zinc-800 backdrop-blur-sm">
-              <Radio className="w-2.5 h-2.5 text-emerald-400" />
-              Drift: {currentDrift < 0.05 ? "<50ms" : `±${currentDrift.toFixed(2)}s`}
             </span>
+
+            {/* Soundwave Mini Indicator */}
+            {isEffectivelyPlaying && (
+              <div className="flex items-end gap-0.5 h-3">
+                <span className="w-0.5 h-2 bg-secondary equalizer-bar" />
+                <span className="w-0.5 h-3 bg-secondary equalizer-bar" />
+                <span className="w-0.5 h-1.5 bg-secondary equalizer-bar" />
+                <span className="w-0.5 h-2.5 bg-secondary equalizer-bar" />
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-zinc-300 bg-black/60 px-2 py-0.5 rounded-full border border-zinc-800 backdrop-blur-sm">
-              ID: {activeVideoId} (rev {playbackState.revision})
+          <div className="flex items-center gap-3 text-tertiary font-mono text-xs">
+            <span className="hidden sm:inline">
+              Drift: {currentDrift < 0.05 ? "<38ms" : `±${currentDrift.toFixed(2)}s`}
             </span>
-            <button
-              onClick={handleToggleFullscreen}
-              className="pointer-events-auto p-1.5 rounded-full bg-black/60 hover:bg-black/90 border border-zinc-700 text-zinc-300 hover:text-white transition-all cursor-pointer shadow-md backdrop-blur-sm"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Video"}
-            >
-              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleToggleFullscreen}
+                className="hover:text-on-surface p-1 rounded hover:bg-surface-container-high transition-colors cursor-pointer"
+                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                type="button"
+              >
+                {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* 16:9 Video Viewport */}
+        <div className="relative w-full aspect-video bg-black overflow-hidden group">
+          <YouTubePlayer
+            ref={playerRef}
+            videoId={activeVideoId}
+            onTimeUpdate={(curr, dur) => {
+              setCurrentTime(curr);
+              if (dur > 0) setDuration(dur);
+            }}
+            onEnded={() => {
+              if (isHost && onNextTrack && autoPlayQueue) onNextTrack();
+            }}
+          />
+
+          {/* Playlist Completed State Overlay */}
+          {isPlaylistFinished && (
+            <div className="absolute inset-0 bg-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 space-y-4 animate-in fade-in">
+              <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-primary/30 flex items-center justify-center text-primary shadow-xs">
+                <Radio className="w-7 h-7 text-primary" />
+              </div>
+              <div className="space-y-1 max-w-sm">
+                <h3 className="text-lg font-bold text-on-surface">Queue Completed</h3>
+                <p className="text-xs text-tertiary leading-relaxed">
+                  All tracks in the shared queue have played. Replay from the beginning or drop more songs to keep listening together!
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                {isHost && onReplayPlaylist && (
+                  <button
+                    type="button"
+                    onClick={onReplayPlaylist}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-container text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Replay Queue
+                  </button>
+                )}
+                {onOpenAddSong && (
+                  <button
+                    type="button"
+                    onClick={onOpenAddSong}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-primary" /> Add Songs
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Host URL / Track Selector Drawer */}
-      {isHost && (
-        <div className="rounded-2xl bg-zinc-900/60 border border-zinc-800/80 p-3.5 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Host Controls: Select YouTube Stream</span>
-            </span>
+      {/* 2. Quick Picks Bar & Paste URL Drawer */}
+      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center flex-wrap gap-2">
+          <span className="text-xs font-semibold text-tertiary mr-1">Quick Picks:</span>
+          {PRESET_TRACKS.map((preset) => (
             <button
-              onClick={() => setShowUrlInput((prev) => !prev)}
-              className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 transition-colors cursor-pointer"
+              key={preset.id}
+              onClick={() => {
+                if (!isHost) return;
+                sendChangeVideo(preset.id, 0);
+                if (onChangeVideo) {
+                  onChangeVideo(preset.id, preset.title);
+                }
+              }}
+              disabled={!isHost}
+              className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
+                activeVideoId === preset.id
+                  ? "bg-[#FFF7ED] text-primary border border-primary/50 font-semibold"
+                  : "bg-surface-container hover:bg-surface-container-high text-on-surface border border-transparent"
+              } ${!isHost ? "opacity-50 cursor-not-allowed" : ""}`}
+              type="button"
             >
-              <LinkIcon className="w-3.5 h-3.5" />
-              <span>{showUrlInput ? "Hide Link Input" : "Paste YouTube Link"}</span>
+              {preset.title}
+            </button>
+          ))}
+        </div>
+
+        {isHost && (
+          <button
+            onClick={() => setShowUrlInput((prev) => !prev)}
+            className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            type="button"
+          >
+            <LinkIcon className="w-3.5 h-3.5" />
+            <span>{showUrlInput ? "Close Link Input" : "Paste YouTube Link"}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Host Custom URL Input Box */}
+      {isHost && showUrlInput && (
+        <form onSubmit={handleLoadCustomUrl} className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant p-3 shadow-xs flex flex-col gap-2 animate-in fade-in">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Paste any YouTube URL (e.g. https://www.youtube.com/watch?v=...)"
+              value={customUrlInput}
+              onChange={(e) => {
+                setCustomUrlInput(e.target.value);
+                setUrlError(null);
+              }}
+              className="flex-1 text-xs rounded-lg bg-surface border border-outline-variant px-3 py-2 text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 text-xs font-semibold bg-primary hover:bg-primary-container text-white rounded-lg shadow-xs cursor-pointer transition-colors"
+            >
+              Broadcast Song
             </button>
           </div>
-
-          {showUrlInput && (
-            <form onSubmit={handleLoadCustomUrl} className="space-y-2 animate-in fade-in">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Paste any YouTube URL (e.g. https://www.youtube.com/watch?v=...)"
-                  value={customUrlInput}
-                  onChange={(e) => {
-                    setCustomUrlInput(e.target.value);
-                    setUrlError(null);
-                  }}
-                  className="flex-1 text-xs rounded-xl bg-zinc-950 border border-zinc-700 px-3 py-2 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-xl shadow-sm cursor-pointer transition-all"
-                >
-                  Broadcast Song
-                </button>
-              </div>
-              {urlError && <p className="text-xs text-red-400">{urlError}</p>}
-            </form>
-          )}
-
-          {/* Quick Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-            <span className="text-zinc-500 text-[11px]">Quick Picks:</span>
-            {PRESET_TRACKS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  sendChangeVideo(preset.id, 0);
-                  if (onChangeVideo) {
-                    onChangeVideo(preset.id, preset.title);
-                  }
-                }}
-                className={`px-2.5 py-1 rounded-lg border text-[11px] transition-all cursor-pointer ${
-                  activeVideoId === preset.id
-                    ? "bg-purple-600/30 border-purple-500 text-purple-200"
-                    : "bg-zinc-800/60 border-zinc-700/60 text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {preset.title.split("-")[0]?.trim()}
-              </button>
-            ))}
-          </div>
-        </div>
+          {urlError && <p className="text-xs text-error font-medium">{urlError}</p>}
+        </form>
       )}
 
-      {/* Control Bar & Timestamp Scrubber */}
-      <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4 md:p-5 shadow-xl backdrop-blur-md space-y-3">
-        {/* Scrubber / Progress Bar */}
-        <div className="space-y-1">
+      {/* 3. Transport & Progress Scrubber Deck */}
+      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-4 md:p-5 flex flex-col gap-3">
+        {/* Interactive Progress Scrubber */}
+        <div className="flex flex-col gap-1.5">
           <div className="relative group/scrub flex items-center cursor-pointer">
             <input
               type="range"
@@ -368,54 +355,65 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
               value={currentTime}
               onChange={handleSeek}
               disabled={!isHost}
-              className={`w-full h-1.5 rounded-lg appearance-none bg-zinc-800 accent-purple-500 cursor-pointer focus:outline-none transition-all ${
-                isHost ? "hover:h-2.5" : "cursor-not-allowed opacity-80"
+              className={`w-full h-2 rounded-lg appearance-none bg-surface-container accent-primary cursor-pointer focus:outline-none transition-all ${
+                isHost ? "hover:h-2.5" : "cursor-not-allowed opacity-90"
               }`}
               style={{
-                background: `linear-gradient(to right, #9333ea 0%, #6366f1 ${progressPercent}%, #27272a ${progressPercent}%, #27272a 100%)`,
+                background: `linear-gradient(to right, #ea580c 0%, #ea580c ${progressPercent}%, #e4e1e6 ${progressPercent}%, #e4e1e6 100%)`,
               }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 px-0.5">
+
+          <div className="flex justify-between items-center font-mono text-xs text-tertiary font-medium">
             <span>{formatTime(currentTime)}</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-tertiary/80">
+              TIME ELAPSED
+            </span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
-        {/* Controls Bar */}
-        <div className="flex items-center justify-between gap-4 pt-1">
-          {/* Left: Volume */}
-          <div className="flex items-center gap-2.5 w-32 md:w-44">
+        {/* Controls Row: Volume | Center Transport | Autoplay */}
+        <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-3 pt-1 border-t border-outline-variant/60">
+          {/* Left: Volume Slider */}
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleToggleMute}
-              className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="text-tertiary hover:text-on-surface transition-colors cursor-pointer"
+              type="button"
               aria-label={isMuted ? "Unmute" : "Mute"}
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-4 h-4 text-rose-400" />
+                <VolumeX className="w-4 h-4 text-error" />
               ) : (
                 <Volume2 className="w-4 h-4" />
               )}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="w-full h-1 rounded-lg appearance-none bg-zinc-800 accent-purple-500 cursor-pointer"
-            />
+            <div className="w-24 flex items-center">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={isMuted ? 0 : volume}
+                onChange={handleVolumeChange}
+                className="w-full h-1.5 rounded bg-surface-container accent-on-surface cursor-pointer"
+              />
+            </div>
+            <span className="font-mono text-xs text-tertiary">
+              {isMuted ? "0%" : `${volume}%`}
+            </span>
           </div>
 
-          {/* Center: Playback Controls */}
-          <div className="flex items-center gap-2 md:gap-3">
+          {/* Center: Precision Audio Controls */}
+          <div className="flex items-center justify-center gap-2">
             <button
               onClick={onPreviousTrack}
               disabled={!isHost}
-              title={isHost ? "Previous Track" : "Only Host can skip"}
-              className={`p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all ${
-                !isHost ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
+              title={isHost ? "Previous Track" : "Only Host can skip"}
+              type="button"
             >
               <SkipBack className="w-4 h-4" />
             </button>
@@ -423,27 +421,25 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={() => handleSkipSeconds(-10)}
               disabled={!isHost}
-              title={isHost ? "Rewind 10s" : "Only Host can seek"}
-              className={`p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all ${
-                !isHost ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
+              title={isHost ? "Rewind 10 seconds" : "Only Host can seek"}
+              type="button"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
 
-            {/* Main Play/Pause Button */}
+            {/* Big Solid Charcoal Master Play/Pause */}
             <button
               onClick={handleTogglePlay}
+              className="w-12 h-12 rounded-full bg-on-surface hover:bg-black text-white flex items-center justify-center shadow-md transition-transform active:scale-95 cursor-pointer"
               title={
                 isHost
                   ? (isRoomPlaying ? "Pause for All" : "Play for All")
-                  : (isLocallyPaused ? "Resume & Flow with Room" : "Pause My Audio")
+                  : (isLocallyPaused ? "Resume & Follow Room" : "Pause My Audio")
               }
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all transform active:scale-95 cursor-pointer ${
-                isEffectivelyPlaying
-                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/40 border border-purple-400/40"
-                  : "bg-white text-zinc-950 hover:bg-zinc-200 shadow-lg shadow-white/20"
-              }`}
+              type="button"
             >
               {isEffectivelyPlaying ? (
                 <Pause className="w-5 h-5 fill-current" />
@@ -455,10 +451,11 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={() => handleSkipSeconds(10)}
               disabled={!isHost}
-              title={isHost ? "Forward 10s" : "Only Host can seek"}
-              className={`p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all ${
-                !isHost ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
+              title={isHost ? "Forward 10 seconds" : "Only Host can seek"}
+              type="button"
             >
               <RotateCw className="w-4 h-4" />
             </button>
@@ -466,47 +463,47 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={onNextTrack}
               disabled={!isHost}
-              title={isHost ? "Next Track" : "Only Host can skip"}
-              className={`p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all ${
-                !isHost ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
+              title={isHost ? "Next Track" : "Only Host can skip"}
+              type="button"
             >
               <SkipForward className="w-4 h-4" />
             </button>
-
-            {/* Auto-Play Queue Toggle */}
-            <button
-              onClick={() => setAutoPlayQueue((prev) => !prev)}
-              title={autoPlayQueue ? "Auto-Play Queue: Enabled (continuous play)" : "Auto-Play Queue: Disabled"}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                autoPlayQueue
-                  ? "bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30"
-                  : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <Repeat className={`w-3.5 h-3.5 ${autoPlayQueue ? "text-purple-400" : "text-zinc-500"}`} />
-              <span className="hidden sm:inline">Autoplay</span>
-            </button>
           </div>
 
-          {/* Right: Authoritative Sync Pill */}
-          <div className="flex items-center justify-end gap-2 w-32 md:w-44 text-xs font-mono text-zinc-400">
-            <span className="capitalize">{isEffectivelyPlaying ? "Streaming" : "Paused"}</span>
+          {/* Right: Autoplay Toggle Pill */}
+          <div className="flex items-center md:justify-end gap-2">
+            <button
+              onClick={() => setAutoPlayQueue((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded cursor-pointer select-none transition-colors ${
+                autoPlayQueue ? "bg-[#FFF7ED] text-primary border border-primary/30" : "bg-surface-container text-tertiary"
+              }`}
+              title="Continuous auto-play for shared queue"
+              type="button"
+            >
+              <Repeat className="w-3.5 h-3.5" />
+              <span className="font-mono text-[11px] font-semibold uppercase">
+                Autoplay {autoPlayQueue ? "On" : "Off"}
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Non-host information banner */}
+        {/* Listener Notification */}
         {!isHost && (
-          <div className="flex items-center justify-center gap-2 pt-1 text-center">
-            <span className="text-[11px] text-zinc-400">
+          <div className="flex items-center justify-center gap-2 pt-1 text-center text-xs text-tertiary">
+            <span>
               {isLocallyPaused
                 ? "You paused playback locally."
-                : "Synchronized listening: Follows room in real time."}
+                : "Synchronized listening: Follows room live in real time."}
             </span>
             {isLocallyPaused && (
               <button
                 onClick={resyncToLive}
-                className="text-[11px] text-purple-400 hover:text-purple-300 underline font-medium cursor-pointer"
+                className="text-primary hover:underline font-semibold cursor-pointer"
+                type="button"
               >
                 Sync with Room Live →
               </button>

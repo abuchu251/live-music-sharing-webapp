@@ -15,35 +15,35 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full space-y-1.5 text-left">
         {label && (
-          <label htmlFor={inputId} className="block text-xs font-medium text-zinc-300">
+          <label htmlFor={inputId} className="block text-xs font-semibold text-on-surface">
             {label}
           </label>
         )}
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3 text-zinc-400 pointer-events-none">
+            <div className="absolute left-3.5 text-tertiary pointer-events-none">
               {leftIcon}
             </div>
           )}
           <input
             ref={ref}
             id={inputId}
-            className={`w-full rounded-xl bg-zinc-900/80 border text-zinc-100 placeholder-zinc-500 text-sm py-2.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/80 ${
+            className={`w-full rounded-lg bg-surface border text-on-surface placeholder-tertiary/70 text-sm py-2.5 transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary ${
               leftIcon ? "pl-10" : "pl-3.5"
             } ${rightIcon ? "pr-10" : "pr-3.5"} ${
               error
-                ? "border-red-500/60 focus:border-red-500 focus:ring-red-500/30"
-                : "border-zinc-800 hover:border-zinc-700"
+                ? "border-error focus:border-error focus:ring-error"
+                : "border-outline-variant hover:border-tertiary/60"
             } ${className}`}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3 text-zinc-400">{rightIcon}</div>
+            <div className="absolute right-3.5 text-tertiary">{rightIcon}</div>
           )}
         </div>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-error font-medium">{error}</p>}
         {!error && helperText && (
-          <p className="text-xs text-zinc-500">{helperText}</p>
+          <p className="text-xs text-tertiary">{helperText}</p>
         )}
       </div>
     );
@@ -51,4 +51,3 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 );
 
 Input.displayName = "Input";
-

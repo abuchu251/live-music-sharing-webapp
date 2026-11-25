@@ -1,34 +1,100 @@
 @import "tailwindcss";
 
+@theme {
+  --color-surface: #FAF9F6;
+  --color-surface-dim: #dcd9dd;
+  --color-surface-bright: #fbf8fc;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f6f2f7;
+  --color-surface-container: #f0edf1;
+  --color-surface-container-high: #eae7eb;
+  --color-surface-container-highest: #e4e1e6;
+
+  --color-on-surface: #1b1b1e;
+  --color-on-surface-variant: #5a4138;
+  --color-inverse-surface: #18181b;
+  --color-inverse-on-surface: #f3f0f4;
+
+  --color-outline: #8e7166;
+  --color-outline-variant: #e4e4e7;
+
+  --color-primary: #ea580c;
+  --color-primary-container: #c2410c;
+  --color-primary-fixed: #ffdbce;
+  --color-primary-fixed-dim: #ffb599;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #fffbff;
+  --color-on-primary-fixed: #370e00;
+
+  --color-secondary: #16a34a;
+  --color-secondary-container: #7cf994;
+  --color-secondary-fixed: #7ffc97;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #007230;
+
+  --color-tertiary: #71717a;
+  --color-tertiary-container: #74747d;
+  --color-tertiary-fixed: #e3e1ec;
+  --color-tertiary-fixed-dim: #c6c5cf;
+  --color-on-tertiary: #ffffff;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 @layer base {
-  body {
-    background-color: #09090b;
-    color: #f4f4f5;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #FAF9F6;
+    color: #1b1b1e;
+    font-family: var(--font-sans);
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom scrollbar */
+  /* Custom subtle scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #09090b;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: #d4d4d8;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f46;
+    background: #a1a1aa;
   }
 }
 
-/* Equalizer animation for playing songs */
+/* Material symbols utility */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soundwave animations for active audio track */
 @keyframes bounce-bars {
   0%, 100% { height: 4px; }
-  50% { height: 18px; }
+  50% { height: 16px; }
 }
 
 .equalizer-bar:nth-child(1) { animation: bounce-bars 0.8s ease-in-out infinite; }

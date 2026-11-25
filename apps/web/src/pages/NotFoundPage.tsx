@@ -5,24 +5,21 @@ import { Button } from "../components/ui/Button";
 
 export const NotFoundPage: React.FC = () => {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-zinc-950 text-zinc-100 text-center relative overflow-hidden">
-      {/* Ambient background glow */}
-      <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-
-      <div className="max-w-md w-full space-y-6">
-        <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-purple-400 shadow-xl">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-surface text-on-surface text-center relative overflow-hidden">
+      <div className="max-w-md w-full bg-white border border-outline rounded-2xl p-8 shadow-sm space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary shadow-xs">
           <Music className="w-8 h-8" />
         </div>
 
         <div className="space-y-2">
-          <span className="text-xs font-mono uppercase tracking-widest text-purple-400">
-            Error 404
+          <span className="text-xs font-mono uppercase tracking-widest text-primary font-bold">
+            Status 404 · Session Not Found
           </span>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Lost in the Sound?
+          <h1 className="text-2xl font-extrabold tracking-tight text-on-surface font-sans">
+            Lost in the Frequency
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed">
-            The listening room or page you are looking for has closed, moved, or never existed.
+          <p className="text-sm text-on-surface-variant leading-relaxed">
+            The listening room or studio page you are looking for has concluded, moved, or never existed.
           </p>
         </div>
 
@@ -34,7 +31,7 @@ export const NotFoundPage: React.FC = () => {
               leftIcon={<Home className="w-4 h-4" />}
               className="w-full sm:w-auto"
             >
-              Back to Home
+              Back to Overview
             </Button>
           </Link>
           <Link to="/join" className="w-full sm:w-auto">
@@ -44,7 +41,7 @@ export const NotFoundPage: React.FC = () => {
               leftIcon={<Radio className="w-4 h-4" />}
               className="w-full sm:w-auto"
             >
-              Browse Rooms
+              Browse Sessions
             </Button>
           </Link>
         </div>
