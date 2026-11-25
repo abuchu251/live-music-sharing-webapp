@@ -485,8 +485,8 @@ export const ListeningRoomPage: React.FC = () => {
   // Direct Link Join Prompt Modal
   if (needsNamePrompt) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-surface text-on-surface">
-        <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 md:p-8 shadow-[0_20px_48px_-12px_rgba(24,24,27,0.18)] space-y-5 animate-in fade-in">
+      <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 bg-surface text-on-surface">
+        <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 sm:p-6 md:p-8 shadow-[0_20px_48px_-12px_rgba(24,24,27,0.18)] space-y-4 sm:space-y-5 animate-in fade-in my-auto max-h-[calc(100vh-1.5rem)] overflow-y-auto">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
             <span className="font-mono text-[11px] uppercase tracking-widest text-on-surface-variant font-semibold">
@@ -495,7 +495,7 @@ export const ListeningRoomPage: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-on-surface">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-on-surface">
               {room?.name || "SyncTune Studio"}
             </h2>
             <p className="text-xs text-tertiary leading-relaxed">
@@ -520,7 +520,7 @@ export const ListeningRoomPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-on-surface">Pick a Desk Avatar</label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                 {DESK_AVATARS.map((av) => (
                   <button
                     key={av}
@@ -596,30 +596,30 @@ export const ListeningRoomPage: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-surface text-on-surface antialiased">
       {/* Top Editorial Sub-Bar */}
       <header className="sticky top-0 z-40 w-full bg-surface/90 backdrop-blur-md border-b border-outline-variant shadow-[0_1px_8px_rgba(27,27,30,0.04)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left Meta Cluster */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={handleBackToHome}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container text-on-surface text-xs font-semibold transition-colors cursor-pointer shrink-0"
               title="Return to Home (Keeps audio playing in background)"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
+              <span className="hidden xs:inline">Back</span>
             </button>
 
-            <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-white font-bold text-sm shrink-0">
-              S
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-primary flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0">
+              J
             </div>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-sm md:text-base font-bold text-on-surface truncate">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <h1 className="text-xs sm:text-sm md:text-base font-bold text-on-surface truncate max-w-[100px] xs:max-w-[140px] sm:max-w-[220px] md:max-w-none">
                 {room.name}
               </h1>
 
               <button
                 onClick={handleCopyRoomCode}
-                className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container transition-all cursor-pointer shrink-0"
+                className="flex items-center gap-1 font-mono text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs hover:bg-surface-container transition-all cursor-pointer shrink-0"
                 title="Click to copy room code"
               >
                 <span>#{roomId.slice(0, 6).toUpperCase()}</span>
@@ -630,7 +630,7 @@ export const ListeningRoomPage: React.FC = () => {
                 )}
               </button>
 
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs shrink-0">
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface-container-lowest border border-outline-variant shadow-xs shrink-0">
                 <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
                 <span className="font-mono text-[11px] text-secondary font-medium tracking-tight">
                   ● Live Socket • &lt;38ms drift
@@ -640,46 +640,48 @@ export const ListeningRoomPage: React.FC = () => {
           </div>
 
           {/* Right Controls Cluster */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <Button
               variant="secondary"
               size="sm"
               leftIcon={copiedLink ? <Check className="w-3.5 h-3.5 text-secondary" /> : <LinkIcon className="w-3.5 h-3.5" />}
               onClick={handleCopyInvite}
+              className="px-2 sm:px-3 text-xs"
             >
-              {copiedLink ? "Copied! 🎉" : "Copy Invite Link"}
+              <span className="hidden sm:inline">{copiedLink ? "Copied! 🎉" : "Copy Invite Link"}</span>
+              <span className="sm:hidden">{copiedLink ? "Copied!" : "Share"}</span>
             </Button>
 
             {isHost ? (
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-error/10 hover:text-error text-tertiary border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-error/10 hover:text-error text-tertiary border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Delete this room permanently"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete Room</span>
+                <span className="hidden md:inline">Delete Room</span>
               </button>
             ) : (
               <button
                 onClick={handleExplicitLeave}
-                className="px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-tertiary hover:text-on-surface border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-tertiary hover:text-on-surface border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Leave room"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Leave</span>
+                <span className="hidden md:inline">Leave</span>
               </button>
             )}
 
             {/* Host or Co-Host Badge */}
-            <div className="hidden sm:flex items-center gap-1.5 pl-2 py-1 pr-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs text-xs">
-              <span className="text-sm">{avatar}</span>
-              <span className="font-semibold text-on-surface">{username}</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-2 py-1 pr-1.5 sm:pr-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant shadow-xs text-xs">
+              <span className="text-xs sm:text-sm">{avatar}</span>
+              <span className="font-semibold text-on-surface hidden sm:inline max-w-[80px] truncate">{username}</span>
               {isHost ? (
-                <span className="px-1.5 py-0.5 rounded bg-primary text-white font-mono text-[10px] uppercase font-bold tracking-wider">
+                <span className="px-1 sm:px-1.5 py-0.5 rounded bg-primary text-white font-mono text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">
                   Host
                 </span>
               ) : isCohost ? (
-                <span className="px-1.5 py-0.5 rounded bg-amber-600 text-white font-mono text-[10px] uppercase font-bold tracking-wider">
+                <span className="px-1 sm:px-1.5 py-0.5 rounded bg-amber-600 text-white font-mono text-[9px] sm:text-[10px] uppercase font-bold tracking-wider">
                   Co-Host
                 </span>
               ) : null}
@@ -689,7 +691,7 @@ export const ListeningRoomPage: React.FC = () => {
       </header>
 
       {/* Main 2-Column Responsive Workspace Grid (8 cols / 4 cols) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4">
         {/* Host Promotion Banner */}
         {hostPromotedToast && (
           <div className="flex items-center justify-between p-3.5 rounded-lg bg-[#FFF7ED] border border-primary/40 text-xs text-on-surface animate-in fade-in">
@@ -708,7 +710,7 @@ export const ListeningRoomPage: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
           {/* LEFT COLUMN: Stage, Scrubber & Telemetry (8 cols) */}
           <section className="lg:col-span-8 flex flex-col gap-4">
             <RoomPlayer
@@ -724,7 +726,7 @@ export const ListeningRoomPage: React.FC = () => {
             />
 
             {/* Bottom Room Telemetry Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
               <div className="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3.5 flex flex-col justify-between">
                 <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
                   Room Status
@@ -757,7 +759,7 @@ export const ListeningRoomPage: React.FC = () => {
           </section>
 
           {/* RIGHT COLUMN: Sidebar (4 cols) */}
-          <aside className="lg:col-span-4 h-[680px]">
+          <aside className="lg:col-span-4 h-auto lg:h-[680px]">
             <RoomSidebar
               roomId={room.id}
               roomName={room.name}

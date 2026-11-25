@@ -130,10 +130,10 @@ export const JoinRoomPage: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-surface text-on-surface">
       <Navbar />
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-12 space-y-12">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 space-y-8 sm:space-y-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-tertiary hover:text-on-surface transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Overview</span>
@@ -143,16 +143,16 @@ export const JoinRoomPage: React.FC = () => {
           <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mx-auto shadow-xs">
             <Radio className="w-6 h-6" />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-on-surface font-sans">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface font-sans">
             Join a Listening Room
           </h1>
-          <p className="text-sm text-on-surface-variant max-w-md mx-auto">
+          <p className="text-xs sm:text-sm text-tertiary max-w-md mx-auto">
             Paste a room code or invite URL to synchronize playback with the host down to the millisecond.
           </p>
         </div>
 
         {/* Form Card */}
-        <Card className="p-6 sm:p-8 max-w-lg mx-auto bg-white border-outline shadow-sm space-y-6 rounded-2xl">
+        <Card className="p-5 sm:p-8 max-w-lg mx-auto bg-surface-container-lowest border-outline-variant shadow-sm space-y-6 rounded-2xl">
           <form onSubmit={handleJoin} className="space-y-5">
             {error && (
               <div className="p-3 text-xs bg-red-50 border border-red-200 text-red-600 rounded-lg">

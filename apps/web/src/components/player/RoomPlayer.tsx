@@ -279,9 +279,9 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
       </div>
 
       {/* 2. Quick Picks Bar & Paste URL Drawer */}
-      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center flex-wrap gap-2">
-          <span className="text-xs font-semibold text-tertiary mr-1">Quick Picks:</span>
+      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none w-full sm:w-auto">
+          <span className="text-xs font-semibold text-tertiary mr-1 shrink-0">Quick Picks:</span>
           {PRESET_TRACKS.map((preset) => (
             <button
               key={preset.id}
@@ -293,7 +293,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
                 }
               }}
               disabled={!isHost}
-              className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded text-xs transition-colors shrink-0 cursor-pointer ${
                 activeVideoId === preset.id
                   ? "bg-[#FFF7ED] text-primary border border-primary/50 font-semibold"
                   : "bg-surface-container hover:bg-surface-container-high text-on-surface border border-transparent"
@@ -308,7 +308,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
         {isHost && (
           <button
             onClick={() => setShowUrlInput((prev) => !prev)}
-            className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-container text-white text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
             type="button"
           >
             <LinkIcon className="w-3.5 h-3.5" />
@@ -320,7 +320,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
       {/* Host Custom URL Input Box */}
       {isHost && showUrlInput && (
         <form onSubmit={handleLoadCustomUrl} className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant p-3 shadow-xs flex flex-col gap-2 animate-in fade-in">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Paste any YouTube URL (e.g. https://www.youtube.com/watch?v=...)"
@@ -334,7 +334,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             />
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold bg-primary hover:bg-primary-container text-white rounded-lg shadow-xs cursor-pointer transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-xs font-semibold bg-primary hover:bg-primary-container text-white rounded-lg shadow-xs cursor-pointer transition-colors"
             >
               Broadcast Song
             </button>
@@ -344,7 +344,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
       )}
 
       {/* 3. Transport & Progress Scrubber Deck */}
-      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-4 md:p-5 flex flex-col gap-3">
+      <div className="w-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3.5 sm:p-4 md:p-5 flex flex-col gap-3">
         {/* Interactive Progress Scrubber */}
         <div className="flex flex-col gap-1.5">
           <div className="relative group/scrub flex items-center cursor-pointer">
@@ -374,42 +374,13 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
         </div>
 
         {/* Controls Row: Volume | Center Transport | Autoplay */}
-        <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-3 pt-1 border-t border-outline-variant/60">
-          {/* Left: Volume Slider */}
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleToggleMute}
-              className="text-tertiary hover:text-on-surface transition-colors cursor-pointer"
-              type="button"
-              aria-label={isMuted ? "Unmute" : "Mute"}
-            >
-              {isMuted || volume === 0 ? (
-                <VolumeX className="w-4 h-4 text-error" />
-              ) : (
-                <Volume2 className="w-4 h-4" />
-              )}
-            </button>
-            <div className="w-24 flex items-center">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={isMuted ? 0 : volume}
-                onChange={handleVolumeChange}
-                className="w-full h-1.5 rounded bg-surface-container accent-on-surface cursor-pointer"
-              />
-            </div>
-            <span className="font-mono text-xs text-tertiary">
-              {isMuted ? "0%" : `${volume}%`}
-            </span>
-          </div>
-
-          {/* Center: Precision Audio Controls */}
-          <div className="flex items-center justify-center gap-2">
+        <div className="flex flex-col md:grid md:grid-cols-3 items-center gap-3 pt-2 border-t border-outline-variant/60">
+          {/* Center: Precision Audio Controls (Mobile: First) */}
+          <div className="flex items-center justify-center gap-2.5 sm:gap-2 order-1 md:order-2 w-full md:w-auto">
             <button
               onClick={onPreviousTrack}
               disabled={!isHost}
-              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
                 !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
               title={isHost ? "Previous Track" : "Only Host can skip"}
@@ -421,7 +392,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={() => handleSkipSeconds(-10)}
               disabled={!isHost}
-              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
                 !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
               title={isHost ? "Rewind 10 seconds" : "Only Host can seek"}
@@ -433,7 +404,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             {/* Big Solid Charcoal Master Play/Pause */}
             <button
               onClick={handleTogglePlay}
-              className="w-12 h-12 rounded-full bg-on-surface hover:bg-black text-white flex items-center justify-center shadow-md transition-transform active:scale-95 cursor-pointer"
+              className="w-13 h-13 sm:w-12 sm:h-12 rounded-full bg-on-surface hover:bg-black text-white flex items-center justify-center shadow-md transition-transform active:scale-95 cursor-pointer"
               title={
                 isHost
                   ? (isRoomPlaying ? "Pause for All" : "Play for All")
@@ -451,7 +422,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={() => handleSkipSeconds(10)}
               disabled={!isHost}
-              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
                 !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
               title={isHost ? "Forward 10 seconds" : "Only Host can seek"}
@@ -463,7 +434,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             <button
               onClick={onNextTrack}
               disabled={!isHost}
-              className={`w-8 h-8 rounded flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
+              className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
                 !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
               title={isHost ? "Next Track" : "Only Host can skip"}
@@ -473,11 +444,40 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             </button>
           </div>
 
-          {/* Right: Autoplay Toggle Pill */}
-          <div className="flex items-center md:justify-end gap-2">
+          {/* Left: Volume Slider (Mobile: Second) */}
+          <div className="flex items-center justify-center md:justify-start gap-2.5 order-2 md:order-1 w-full md:w-auto">
+            <button
+              onClick={handleToggleMute}
+              className="text-tertiary hover:text-on-surface transition-colors cursor-pointer p-1"
+              type="button"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-error" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
+            </button>
+            <div className="w-28 sm:w-24 flex items-center">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={isMuted ? 0 : volume}
+                onChange={handleVolumeChange}
+                className="w-full h-2 sm:h-1.5 rounded bg-surface-container accent-on-surface cursor-pointer"
+              />
+            </div>
+            <span className="font-mono text-xs text-tertiary w-8">
+              {isMuted ? "0%" : `${volume}%`}
+            </span>
+          </div>
+
+          {/* Right: Autoplay Toggle Pill (Mobile: Third) */}
+          <div className="flex items-center justify-center md:justify-end gap-2 order-3 w-full md:w-auto">
             <button
               onClick={() => setAutoPlayQueue((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded cursor-pointer select-none transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded cursor-pointer select-none transition-colors ${
                 autoPlayQueue ? "bg-[#FFF7ED] text-primary border border-primary/30" : "bg-surface-container text-tertiary"
               }`}
               title="Continuous auto-play for shared queue"

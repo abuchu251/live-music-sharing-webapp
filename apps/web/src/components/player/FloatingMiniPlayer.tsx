@@ -54,7 +54,7 @@ export const FloatingMiniPlayer: React.FC = () => {
   return (
     <aside
       aria-label="Active Room Mini Player"
-      className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] rounded-2xl bg-surface-container-lowest/95 border border-outline-variant p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-50 max-w-sm w-[calc(100vw-1.5rem)] sm:w-[380px] rounded-2xl bg-surface-container-lowest/95 border border-outline-variant p-3.5 sm:p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300"
     >
       <div className="flex items-center gap-3">
         {/* Vermilion Radio Icon with subtle pulsing ring */}

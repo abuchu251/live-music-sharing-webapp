@@ -144,7 +144,7 @@ export const CreateRoomModal: React.FC<CreateRoomModalProps> = ({ isOpen, onClos
             <span className="text-[11px] text-tertiary">(shows beside your queue tracks)</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-2" role="radiogroup">
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2" role="radiogroup">
             {DESK_AVATARS.map((item) => {
               const isSelected = selectedAvatar === item.icon;
               return (

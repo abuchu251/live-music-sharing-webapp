@@ -82,15 +82,15 @@ export const LandingPage: React.FC = () => {
         <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
           <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
             {/* Monospace Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-surface-container-lowest border border-outline-variant shadow-xs mb-6">
-              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-              <span className="font-mono text-xs uppercase tracking-wider text-on-surface-variant font-semibold">
-                SYNCED YOUTUBE LISTENING • NO EXTENSIONS NEEDED
+            <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1 rounded-full bg-surface-container-lowest border border-outline-variant shadow-xs mb-6 text-center">
+              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse shrink-0" />
+              <span className="font-mono text-[10px] sm:text-xs uppercase tracking-wider text-on-surface-variant font-semibold">
+                SYNCED YOUTUBE LISTENING • NO EXTENSIONS
               </span>
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-on-surface mb-4 leading-[1.12]">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-on-surface mb-4 leading-[1.18] sm:leading-[1.12]">
               Put the same song on.
               <br className="hidden sm:inline" />
               {" "}At the exact same millisecond.

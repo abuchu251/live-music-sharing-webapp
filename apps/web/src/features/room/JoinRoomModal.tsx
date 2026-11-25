@@ -137,7 +137,7 @@ export const JoinRoomModal: React.FC<JoinRoomModalProps> = ({
             <span className="text-xs font-semibold text-on-surface">Pick an Avatar</span>
             <span className="text-[11px] text-tertiary">(shows in room listeners)</span>
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
             {DESK_AVATARS.map((item) => {
               const isSelected = selectedAvatar === item.icon;
               return (

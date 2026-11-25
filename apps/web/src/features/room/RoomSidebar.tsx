@@ -193,7 +193,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   };
 
   return (
-    <div className="w-full h-full bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-4 flex flex-col gap-3">
+    <div className="w-full h-full min-h-[460px] sm:min-h-[520px] lg:min-h-0 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-xs p-3 sm:p-4 flex flex-col gap-3">
       {/* Sidebar Header */}
       <div className="flex flex-col gap-0.5 pb-2 bg-surface-container-low p-3 rounded-lg border border-outline-variant/60">
         <span className="font-mono text-[10px] uppercase tracking-wider text-tertiary font-bold">
