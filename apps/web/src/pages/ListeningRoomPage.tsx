@@ -142,6 +142,9 @@ export const ListeningRoomPage: React.FC = () => {
         if (!isMounted) return;
 
         setRoom(fetchedRoom);
+        if (fetchedRoom.participants) {
+          setParticipants(fetchedRoom.participants);
+        }
         setQueue(fetchedRoom.queue || []);
         playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision || 0;
 
@@ -171,6 +174,15 @@ export const ListeningRoomPage: React.FC = () => {
             if (res.ok && res.participantId) {
               setParticipantId(res.participantId);
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
+              if (res.room) {
+                setRoom(res.room);
+                if (res.room.participants) {
+                  setParticipants(res.room.participants);
+                }
+                if (res.room.queue) {
+                  setQueue(res.room.queue);
+                }
+              }
               setIsLoading(false);
             } else {
               setError(res.error || "Failed to join room via socket.");
@@ -411,7 +423,7 @@ export const ListeningRoomPage: React.FC = () => {
     username: p.username,
     avatar: p.avatar,
     role: p.role,
-    status: p.isConnected ? "online" : "offline",
+    status: p.isConnected !== false ? "online" : "offline",
     ping: 24,
   }));
 

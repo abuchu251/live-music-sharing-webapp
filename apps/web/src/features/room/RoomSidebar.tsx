@@ -218,7 +218,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
           type="button"
         >
           <span>People</span>
-          <span className="font-mono text-[11px]">{participants.filter((p) => p.status === "online").length}</span>
+          <span className="font-mono text-[11px]">{participants.filter((p) => p.status !== "offline").length}</span>
         </button>
 
         <button
@@ -385,7 +385,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline-variant/60">
             <span className="font-mono text-[11px] uppercase tracking-wider text-tertiary font-bold">
-              Connected Coworkers ({participants.filter((p) => p.status === "online").length})
+              Connected Coworkers ({participants.filter((p) => p.status !== "offline").length})
             </span>
             <span className="font-mono text-[11px] text-secondary font-semibold">
               All Synced
