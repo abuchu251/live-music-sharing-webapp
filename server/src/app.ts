@@ -6,6 +6,7 @@ import { isDatabaseReady } from "./db/prisma.js";
 import { roomRouter } from "./modules/rooms/routes.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { playlistRouter } from "./modules/playlists/routes.js";
+import { youtubeRouter } from "./modules/youtube/routes.js";
 
 export function createApp(): Express {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp(): Express {
   app.use("/api/auth", authRouter);
   app.use("/api/rooms", roomRouter);
   app.use("/api/playlists", playlistRouter);
+  app.use("/api/youtube", youtubeRouter);
 
   // Error handler (must be last)
   app.use(errorHandler);

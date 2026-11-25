@@ -8,9 +8,13 @@ import {
   Crown,
   Play,
   GripVertical,
+  Search,
+  Loader2,
+  X,
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
+import { searchYouTube, type YouTubeSearchResult } from "../../services/api";
 import type { QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "./mockData";
 
@@ -66,6 +70,9 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   const [newSongInput, setNewSongInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -130,7 +137,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
     });
   };
 
-  const handleAddSongSubmit = (e: React.FormEvent) => {
+  const handleAddSongSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const rawInput = newSongInput.trim();
     if (!rawInput) return;
@@ -138,13 +145,28 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
     const extracted = extractYouTubeVideoId(rawInput);
     if (extracted) {
       onAddSong(`YouTube Track (${extracted})`, extracted);
-    } else {
-      // Direct YouTube search fallback ID
-      onAddSong(rawInput, "jfKfPfyJRdk");
+      setNewSongInput("");
+      setShowAddForm(false);
+      setSearchResults([]);
+      setSearchError(null);
+      return;
     }
 
-    setNewSongInput("");
-    setShowAddForm(false);
+    // Execute live YouTube Search
+    setIsSearching(true);
+    setSearchError(null);
+    try {
+      const results = await searchYouTube(rawInput);
+      setSearchResults(results);
+      if (results.length === 0) {
+        setSearchError("No YouTube videos found matching your search.");
+      }
+    } catch (err: unknown) {
+      setSearchError(err instanceof Error ? err.message : "Failed to search YouTube.");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleChatSubmit = (e: React.FormEvent) => {
@@ -254,31 +276,122 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
 
           {/* Add Song Form Drawer */}
           {showAddForm && (
-            <form onSubmit={handleAddSongSubmit} className="mb-2 p-2.5 rounded-lg bg-surface-container-low border border-outline-variant flex flex-col gap-2 animate-in fade-in">
-              <input
-                type="text"
-                placeholder="Paste YouTube link or enter song title..."
-                value={newSongInput}
-                onChange={(e) => setNewSongInput(e.target.value)}
-                className="w-full text-xs px-2.5 py-1.5 rounded bg-surface-container-lowest border border-outline-variant text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary"
-                autoFocus
-              />
-              <div className="flex items-center justify-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="px-2.5 py-1 text-xs text-tertiary hover:text-on-surface cursor-pointer"
-                >
-                  Cancel
-                </button>
+            <div className="mb-2 p-3 rounded-lg bg-surface-container-low border border-outline-variant flex flex-col gap-2.5 animate-in fade-in">
+              <form onSubmit={handleAddSongSubmit} className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search YouTube songs or paste a link..."
+                    value={newSongInput}
+                    onChange={(e) => {
+                      setNewSongInput(e.target.value);
+                      if (searchError) setSearchError(null);
+                    }}
+                    className="w-full text-xs pl-8 pr-2.5 py-2 rounded bg-surface-container-lowest border border-outline-variant text-on-surface placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-primary font-sans"
+                    autoFocus
+                  />
+                  <Search className="w-3.5 h-3.5 text-tertiary absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {newSongInput && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewSongInput("");
+                        setSearchResults([]);
+                        setSearchError(null);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-tertiary hover:text-on-surface p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
                 <button
                   type="submit"
-                  className="px-3 py-1 text-xs font-semibold bg-primary hover:bg-primary-container text-white rounded cursor-pointer"
+                  disabled={isSearching || !newSongInput.trim()}
+                  className="px-3 py-2 text-xs font-semibold bg-primary hover:bg-primary-container disabled:opacity-50 text-white rounded cursor-pointer shrink-0 flex items-center gap-1.5"
                 >
-                  Add to Queue
+                  {isSearching ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : extractYouTubeVideoId(newSongInput.trim()) ? (
+                    "Import"
+                  ) : (
+                    "Search"
+                  )}
+                </button>
+              </form>
+
+              {/* Direct Link Hint */}
+              {extractYouTubeVideoId(newSongInput.trim()) && (
+                <div className="flex items-center gap-1.5 text-[11px] text-secondary font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                  <span>Direct YouTube link detected — ready to import immediately!</span>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {searchError && (
+                <div className="p-2 rounded bg-error/10 border border-error/20 text-error text-[11px]">
+                  {searchError}
+                </div>
+              )}
+
+              {/* Live Search Results List */}
+              {searchResults.length > 0 && (
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 pt-1 border-t border-outline-variant">
+                  <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider block">
+                    YouTube Results ({searchResults.length})
+                  </span>
+                  {searchResults.map((item) => (
+                    <div
+                      key={item.videoId}
+                      className="p-1.5 rounded-md bg-surface-container-lowest border border-outline-variant hover:border-primary/40 flex items-center justify-between gap-2 transition-all"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <img
+                          src={item.thumbnailUrl}
+                          alt={item.title}
+                          className="w-12 h-9 object-cover rounded shrink-0 bg-surface-container"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-on-surface truncate">
+                            {item.title}
+                          </p>
+                          <p className="font-mono text-[10px] text-tertiary truncate">
+                            {item.channelTitle}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onAddSong(item.title, item.videoId);
+                          setSearchResults((prev) => prev.filter((r) => r.videoId !== item.videoId));
+                        }}
+                        className="px-2 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shrink-0 cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1 text-[10px] text-tertiary font-mono">
+                <span>Free YouTube Data API v3</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setSearchResults([]);
+                    setSearchError(null);
+                  }}
+                  className="hover:text-on-surface cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
-            </form>
+            </div>
           )}
 
           {/* Queue Items Scroll Area */}

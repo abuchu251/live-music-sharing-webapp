@@ -147,3 +147,20 @@ export async function deletePlaylistApi(playlistId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export interface YouTubeSearchResult {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+}
+
+export async function searchYouTube(query: string): Promise<YouTubeSearchResult[]> {
+  const res = await request<{ ok: boolean; results?: YouTubeSearchResult[]; error?: string }>(
+    `/youtube/search?q=${encodeURIComponent(query)}`
+  );
+  if (!res.ok) {
+    throw new Error(res.error || "Failed to search YouTube");
+  }
+  return res.results || [];
+}

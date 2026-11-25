@@ -36,6 +36,7 @@ services:
       JWT_EXPIRES_IN: 7d
       APP_URL: https://jemaw.live
       CORS_ORIGIN: "https://jemaw.live,http://jemaw.live,https://www.jemaw.live,http://www.jemaw.live,http://63.176.157.176,http://localhost:5173,*"
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
     expose:
       - "3001"
     healthcheck:

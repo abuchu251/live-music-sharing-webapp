@@ -12,6 +12,7 @@ export const env = {
   jwtSecret: process.env["JWT_SECRET"] ?? "synctune-super-secret-jwt-key-2026",
   jwtExpiresIn: process.env["JWT_EXPIRES_IN"] ?? "7d",
   databaseUrl: process.env["DATABASE_URL"] ?? "",
+  youtubeApiKey: process.env["YOUTUBE_API_KEY"] ?? "",
   isDevelopment: (process.env["NODE_ENV"] ?? "development") === "development",
   isProduction: process.env["NODE_ENV"] === "production",
 } as const;
