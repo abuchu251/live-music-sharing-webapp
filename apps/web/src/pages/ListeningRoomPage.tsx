@@ -251,11 +251,14 @@ export const ListeningRoomPage: React.FC = () => {
 
         socket.on("room:closed", ({ reason }: { reason: string }) => {
           if (!isMounted) return;
+          sessionStorage.removeItem("synctune:active_room");
+          sessionStorage.removeItem(`synctune:participantId:${roomId}`);
           alert(reason || "This room has been closed by the host.");
           navigate("/");
         });
       } catch (err: unknown) {
         if (!isMounted) return;
+        sessionStorage.removeItem("synctune:active_room");
         setError(err instanceof Error ? err.message : "Failed to load room.");
         setIsLoading(false);
       }
@@ -401,6 +404,9 @@ export const ListeningRoomPage: React.FC = () => {
     const socket = getSocket();
     socket.emit("room:close", (res) => {
       if (res.ok) {
+        sessionStorage.removeItem("synctune:active_room");
+        sessionStorage.removeItem(`synctune:participantId:${roomId}`);
+        setShowDeleteModal(false);
         navigate("/");
       } else {
         alert(res.error || "Failed to delete room.");
@@ -409,12 +415,28 @@ export const ListeningRoomPage: React.FC = () => {
   };
 
   const handleExplicitLeave = () => {
+    sessionStorage.removeItem("synctune:active_room");
+    sessionStorage.removeItem(`synctune:participantId:${roomId}`);
     const socket = getSocket();
     socket.emit("room:leave");
     navigate("/");
   };
 
   const handleBackToHome = () => {
+    if (room && roomId) {
+      sessionStorage.setItem(
+        "synctune:active_room",
+        JSON.stringify({
+          roomId,
+          roomName: room.name,
+          isHost,
+          isCohost,
+          currentSongTitle: currentSong?.title || "Live Stream",
+          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
+          participantId: participantId || storedParticipantId,
+        })
+      );
+    }
     navigate("/");
   };
 
@@ -432,6 +454,24 @@ export const ListeningRoomPage: React.FC = () => {
   );
   const isCohost = Boolean(currentParticipant?.role === "COHOST");
   const canControlPlayback = isHost || isCohost;
+
+  // Keep active room in sync in sessionStorage so FloatingMiniPlayer seamlessly resumes session
+  useEffect(() => {
+    if (room && roomId && (participantId || storedParticipantId)) {
+      sessionStorage.setItem(
+        "synctune:active_room",
+        JSON.stringify({
+          roomId,
+          roomName: room.name,
+          isHost,
+          isCohost,
+          currentSongTitle: currentSong?.title || "Live Stream",
+          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
+          participantId: participantId || storedParticipantId,
+        })
+      );
+    }
+  }, [room, roomId, participantId, storedParticipantId, isHost, isCohost, currentSong]);
 
   const sidebarParticipants: MockParticipant[] = participants.map((p) => ({
     id: p.id,

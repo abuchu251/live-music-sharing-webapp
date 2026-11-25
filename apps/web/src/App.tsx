@@ -12,7 +12,7 @@ export function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-purple-600 selection:text-white">
+        <div className="min-h-screen bg-surface text-on-surface antialiased selection:bg-primary selection:text-white">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/join" element={<JoinRoomPage />} />
