@@ -20,6 +20,7 @@ services:
 
   # ─── SyncTune Backend Server ────────────────────────────────
   server:
+    image: ghcr.io/abuchu251/synctune-server:latest
     build:
       context: .
       dockerfile: server/Dockerfile
@@ -49,6 +50,7 @@ services:
 
   # ─── SyncTune Web Frontend (Nginx + SSL) ─────────────────────
   web:
+    image: ghcr.io/abuchu251/synctune-web:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile

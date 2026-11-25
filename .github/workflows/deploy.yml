@@ -5,6 +5,14 @@ on:
     branches:
       - main
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test-and-build:
     name: Build & Validate
@@ -32,9 +40,47 @@ jobs:
       - name: Build Packages & Apps
         run: pnpm run build
 
+  build-and-push-images:
+    name: Build & Push Docker Images
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Server Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: ghcr.io/abuchu251/synctune-server:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Web Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ghcr.io/abuchu251/synctune-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
     name: Deploy to AWS Lightsail
-    needs: test-and-build
+    needs: build-and-push-images
     runs-on: ubuntu-latest
     steps:
       - name: Execute Deployment on Remote Host
@@ -44,18 +90,25 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: 22
-          command_timeout: 30m
-          timeout: 30m
+          command_timeout: 10m
+          timeout: 10m
           script_stop: true
           script: |
             echo "Starting SyncTune continuous deployment..."
             cd /home/ubuntu/synctune
             git pull origin main
             chmod +x ./init-ssl.sh 2>/dev/null || true
-            echo "Building containers sequentially to prevent memory thrashing..."
-            docker compose build web
-            docker compose build server
+
+            echo "Authenticating with GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            echo "Pulling pre-built production container images..."
+            docker compose pull web server
+
+            echo "Starting containers..."
             docker compose up -d --remove-orphans
+
+            echo "Applying database schema migrations..."
             docker exec synctune-server npx prisma db push --skip-generate
 
             # Check and provision Let's Encrypt SSL certificate if not yet present
@@ -68,4 +121,3 @@ jobs:
             fi
 
             echo "SyncTune deployed successfully with HTTPS!"
-
