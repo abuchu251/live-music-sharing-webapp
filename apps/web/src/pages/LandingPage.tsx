@@ -12,12 +12,55 @@ import {
   Clock,
   Shield,
   Layers,
+  Camera,
 } from "lucide-react";
 import { Navbar } from "../components/layout/Navbar";
 import { Footer } from "../components/layout/Footer";
 import { CreateRoomModal } from "../features/room/CreateRoomModal";
 import { JoinRoomModal } from "../features/room/JoinRoomModal";
 import { MOCK_PUBLIC_ROOMS } from "../features/room/mockData";
+
+const GroupPhotoCard: React.FC = () => {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div className="w-full rounded-2xl overflow-hidden bg-surface-container-lowest border border-outline-variant shadow-xs">
+      {!imgError ? (
+        <div className="relative w-full aspect-4/3 sm:aspect-16/10 lg:aspect-4/3 overflow-hidden bg-surface-container-high group">
+          <img
+            src="/team/group.jpg"
+            alt="Jemaw Core Team"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent flex items-end p-5 sm:p-6">
+            <div className="text-white">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-primary font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-xs">
+                THE SQUAD
+              </span>
+              <h3 className="text-lg sm:text-xl font-bold mt-1.5">
+                nana, neba, sami mititi &amp; sami E
+              </h3>
+              <p className="text-[11px] text-zinc-300 mt-0.5">
+                The minds and beats behind Jemaw
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-8 sm:p-12 text-center flex flex-col items-center justify-center border-2 border-dashed border-outline-variant rounded-2xl m-3 bg-surface-container-low/50">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-3">
+            <Camera className="w-5 h-5" />
+          </div>
+          <h4 className="text-sm font-bold text-on-surface">Jemaw Group Photo Placeholder</h4>
+          <p className="text-xs text-tertiary max-w-xs mt-1 leading-relaxed">
+            Drop your picture into <code className="bg-surface-container px-1.5 py-0.5 rounded text-primary font-mono text-[11px] font-semibold">apps/web/public/team/group.jpg</code>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -87,7 +130,7 @@ export const LandingPage: React.FC = () => {
                 <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
                 <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
                 <span className="ml-3 font-mono text-xs text-tertiary hidden sm:inline">
-                  synctune.live/room/oak-desk-44
+                  jemaw.live/room/oak-desk-44
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -292,6 +335,40 @@ export const LandingPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION: OUR STORY */}
+        <section id="our-story" className="w-full py-20 bg-surface border-t border-outline-variant">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+            {/* Split Story Row: Narrative on Left, Group Photo on Right */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+              {/* Left Column: Story Narrative */}
+              <div className="lg:col-span-6 space-y-4">
+                <span className="font-mono text-xs uppercase tracking-wider text-primary font-bold">
+                  THE ORIGIN • JEMAW
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-on-surface mt-1 leading-[1.15]">
+                  Our Story: Music is meant to be shared in real time.
+                </h2>
+                <div className="space-y-4 text-tertiary text-sm sm:text-base leading-relaxed pt-2">
+                  <p>
+                    Jemaw was born out of a simple, shared frustration: listening to music together online was perpetually broken. Whether we were hacking on late-night code, studying across dorms, or just hanging out online, we always wanted to experience songs at the exact same moment.
+                  </p>
+                  <p>
+                    Countdowns like &ldquo;3, 2, 1, hit play&rdquo; never worked. Someone was always on the chorus while another was still buffering on the intro. So we decided to build <strong>Jemaw</strong>—a real-time, server-authoritative listening space where playback locks to the millisecond across every connected listener.
+                  </p>
+                  <p>
+                    No invasive browser extensions, no Spotify account requirements, and zero complicated setup. Just drop a YouTube link, share your room code, and experience music together as if you were sitting at the same desk.
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Column: Group Photo Frame on the side */}
+              <div className="lg:col-span-6">
+                <GroupPhotoCard />
               </div>
             </div>
           </div>

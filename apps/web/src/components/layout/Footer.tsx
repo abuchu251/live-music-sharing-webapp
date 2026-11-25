@@ -6,9 +6,9 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-tertiary">
         <div className="flex items-center gap-2.5">
           <div className="w-5 h-5 rounded bg-primary flex items-center justify-center text-white font-bold text-xs">
-            S
+            J
           </div>
-          <span className="font-semibold text-on-surface">SyncTune</span>
+          <span className="font-semibold text-on-surface">Jemaw</span>
           <span>— Precision YouTube audio synchronization for desks, dorms, and studios.</span>
         </div>
 

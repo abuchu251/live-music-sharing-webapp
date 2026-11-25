@@ -24,10 +24,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onCreateRoom, onJoinRoom }) => {
             className="flex items-center gap-2.5 group transition-transform active:scale-98"
           >
             <div className="w-7 h-7 rounded bg-primary flex items-center justify-center text-on-primary font-bold text-base shadow-xs group-hover:bg-primary-container transition-colors">
-              S
+              J
             </div>
             <span className="font-bold text-lg tracking-tight text-on-surface">
-              SyncTune
+              Jemaw
             </span>
           </Link>
 
