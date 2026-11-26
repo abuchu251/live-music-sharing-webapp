@@ -206,10 +206,14 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
           if (!isMounted) return;
           setIsApiLoading(false);
 
+          const currentOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+          const currentHref = typeof window !== "undefined" ? window.location.href : undefined;
+
           playerRef.current = new YT.Player(ytTarget, {
             videoId,
             width: "100%",
             height: "100%",
+            host: "https://www.youtube.com",
             playerVars: {
               autoplay: autoplay ? 1 : 0,
               controls: controls ? 1 : 0,
@@ -218,6 +222,8 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
               rel: 0,
               playsinline: 1,
               start: startSeconds,
+              origin: currentOrigin,
+              widget_referrer: currentHref,
             },
             events: {
               onReady: () => {
@@ -306,6 +312,14 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
             <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
               {playerError}
             </p>
+            <a
+              href={`https://www.youtube.com/watch?v=${videoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white border border-zinc-700 transition-colors shadow-xs cursor-pointer"
+            >
+              Watch on YouTube ↗
+            </a>
           </div>
         )}
 

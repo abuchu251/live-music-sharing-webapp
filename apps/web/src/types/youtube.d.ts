@@ -14,6 +14,7 @@ declare namespace YT {
     width?: string | number;
     height?: string | number;
     videoId?: string;
+    host?: string;
     playerVars?: PlayerVars;
     events?: {
       onReady?: (event: PlayerEvent) => void;
@@ -38,6 +39,7 @@ declare namespace YT {
     rel?: 0 | 1;
     start?: number;
     mute?: 0 | 1;
+    widget_referrer?: string;
   }
 
   export interface PlayerEvent {
