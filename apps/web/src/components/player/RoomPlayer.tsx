@@ -14,6 +14,7 @@ import {
   Repeat,
   Radio,
   Link as LinkIcon,
+  Music,
 } from "lucide-react";
 import { YouTubePlayer, type YouTubePlayerHandle } from "./YouTubePlayer";
 import { extractYouTubeVideoId } from "../../utils/youtube";
@@ -34,9 +35,9 @@ export interface RoomPlayerProps {
 }
 
 const PRESET_TRACKS = [
-  { id: "jfKfPfyJRdk", title: "☕ lofi hip hop radio" },
-  { id: "5qap5aO4i9A", title: "🌿 Chillhop Beats" },
   { id: "DWcJFNfaw9c", title: "🌆 Synthwave Radio" },
+  { id: "5qap5aO4i9A", title: "🌿 Chillhop Beats" },
+  { id: "4xDzrJKXOOY", title: "☕ Lofi Beats" },
 ];
 
 export const RoomPlayer: React.FC<RoomPlayerProps> = ({
@@ -105,7 +106,8 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
   const isRoomPlaying = playbackState.status === "playing";
   const isEffectivelyPlaying = isHost ? isRoomPlaying : isRoomPlaying && !isLocallyPaused;
-  const activeVideoId = currentSong?.videoId || playbackState.videoId || "jfKfPfyJRdk";
+  const activeVideoId = currentSong?.videoId || playbackState.videoId || "";
+  const isQueueEmpty = !activeVideoId;
 
   const handleTogglePlay = () => {
     if (isHost) {
@@ -187,8 +189,10 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
         <div className="px-4 py-2 bg-surface-container flex items-center justify-between border-b border-outline-variant">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-secondary font-mono text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-              {isLocallyPaused
+              <span className={`w-2 h-2 rounded-full ${isQueueEmpty ? "bg-tertiary" : "bg-secondary animate-pulse"}`} />
+              {isQueueEmpty
+                ? "Queue Empty"
+                : isLocallyPaused
                 ? "Locally Paused"
                 : syncStatus === "in-sync"
                 ? isEffectivelyPlaying
@@ -200,7 +204,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             </span>
 
             {/* Soundwave Mini Indicator */}
-            {isEffectivelyPlaying && (
+            {!isQueueEmpty && isEffectivelyPlaying && (
               <div className="flex items-end gap-0.5 h-3">
                 <span className="w-0.5 h-2 bg-secondary equalizer-bar" />
                 <span className="w-0.5 h-3 bg-secondary equalizer-bar" />
@@ -212,7 +216,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
           <div className="flex items-center gap-3 text-tertiary font-mono text-xs">
             <span className="hidden sm:inline">
-              Drift: {currentDrift < 0.05 ? "<38ms" : `±${currentDrift.toFixed(2)}s`}
+              Drift: {isQueueEmpty ? "—" : currentDrift < 0.05 ? "<38ms" : `±${currentDrift.toFixed(2)}s`}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -229,51 +233,78 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
         {/* 16:9 Video Viewport */}
         <div className="relative w-full aspect-video bg-black overflow-hidden group">
-          <YouTubePlayer
-            ref={playerRef}
-            videoId={activeVideoId}
-            onTimeUpdate={(curr, dur) => {
-              setCurrentTime(curr);
-              if (dur > 0) setDuration(dur);
-            }}
-            onEnded={() => {
-              if (isHost && onNextTrack && autoPlayQueue) onNextTrack();
-            }}
-          />
-
-          {/* Playlist Completed State Overlay */}
-          {isPlaylistFinished && (
-            <div className="absolute inset-0 bg-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 space-y-4 animate-in fade-in">
+          {isQueueEmpty ? (
+            <div className="absolute inset-0 bg-surface flex flex-col items-center justify-center p-6 text-center z-10 space-y-4 animate-in fade-in">
               <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-primary/30 flex items-center justify-center text-primary shadow-xs">
-                <Radio className="w-7 h-7 text-primary" />
+                <Music className="w-7 h-7 text-primary" />
               </div>
-              <div className="space-y-1 max-w-sm">
-                <h3 className="text-lg font-bold text-on-surface">Queue Completed</h3>
+              <div className="space-y-1.5 max-w-sm">
+                <h3 className="text-lg font-bold text-on-surface">Queue is empty</h3>
                 <p className="text-xs text-tertiary leading-relaxed">
-                  All tracks in the shared queue have played. Replay from the beginning or drop more songs to keep listening together!
+                  {isHost
+                    ? "Add songs to start the listening session. Search YouTube, paste a link, or pick a Quick Pick below."
+                    : "Waiting for the host to add tracks to the queue. Hang tight!"}
                 </p>
               </div>
-              <div className="flex items-center gap-2 pt-1">
-                {isHost && onReplayPlaylist && (
-                  <button
-                    type="button"
-                    onClick={onReplayPlaylist}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-container text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" /> Replay Queue
-                  </button>
-                )}
-                {onOpenAddSong && (
-                  <button
-                    type="button"
-                    onClick={onOpenAddSong}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-primary" /> Add Songs
-                  </button>
-                )}
-              </div>
+              {isHost && onOpenAddSong && (
+                <button
+                  type="button"
+                  onClick={onOpenAddSong}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-container text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Songs
+                </button>
+              )}
             </div>
+          ) : (
+            <>
+              <YouTubePlayer
+                ref={playerRef}
+                videoId={activeVideoId}
+                onTimeUpdate={(curr, dur) => {
+                  setCurrentTime(curr);
+                  if (dur > 0) setDuration(dur);
+                }}
+                onEnded={() => {
+                  if (isHost && onNextTrack && autoPlayQueue) onNextTrack();
+                }}
+              />
+
+              {/* Playlist Completed State Overlay */}
+              {isPlaylistFinished && (
+                <div className="absolute inset-0 bg-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 space-y-4 animate-in fade-in">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-primary/30 flex items-center justify-center text-primary shadow-xs">
+                    <Radio className="w-7 h-7 text-primary" />
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <h3 className="text-lg font-bold text-on-surface">Queue Completed</h3>
+                    <p className="text-xs text-tertiary leading-relaxed">
+                      All tracks in the shared queue have played. Replay from the beginning or drop more songs to keep listening together!
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    {isHost && onReplayPlaylist && (
+                      <button
+                        type="button"
+                        onClick={onReplayPlaylist}
+                        className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary-container text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Replay Queue
+                      </button>
+                    )}
+                    {onOpenAddSong && (
+                      <button
+                        type="button"
+                        onClick={onOpenAddSong}
+                        className="px-4 py-2 text-xs font-semibold rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-primary" /> Add Songs
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -354,9 +385,9 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
               max={duration || 100}
               value={currentTime}
               onChange={handleSeek}
-              disabled={!isHost}
+              disabled={!isHost || isQueueEmpty}
               className={`w-full h-2 rounded-lg appearance-none bg-surface-container accent-primary cursor-pointer focus:outline-none transition-all ${
-                isHost ? "hover:h-2.5" : "cursor-not-allowed opacity-90"
+                isHost && !isQueueEmpty ? "hover:h-2.5" : "cursor-not-allowed opacity-90"
               }`}
               style={{
                 background: `linear-gradient(to right, #ea580c 0%, #ea580c ${progressPercent}%, #e4e1e6 ${progressPercent}%, #e4e1e6 100%)`,
@@ -379,11 +410,11 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
           <div className="flex items-center justify-center gap-2.5 sm:gap-2 order-1 md:order-2 w-full md:w-auto">
             <button
               onClick={onPreviousTrack}
-              disabled={!isHost}
+              disabled={!isHost || isQueueEmpty}
               className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
-                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                !isHost || isQueueEmpty ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
-              title={isHost ? "Previous Track" : "Only Host can skip"}
+              title={isQueueEmpty ? "Queue is empty" : isHost ? "Previous Track" : "Only Host can skip"}
               type="button"
             >
               <SkipBack className="w-4 h-4" />
@@ -391,11 +422,11 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
             <button
               onClick={() => handleSkipSeconds(-10)}
-              disabled={!isHost}
+              disabled={!isHost || isQueueEmpty}
               className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
-                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                !isHost || isQueueEmpty ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
-              title={isHost ? "Rewind 10 seconds" : "Only Host can seek"}
+              title={isQueueEmpty ? "Queue is empty" : isHost ? "Rewind 10 seconds" : "Only Host can seek"}
               type="button"
             >
               <RotateCcw className="w-4 h-4" />
@@ -404,15 +435,20 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
             {/* Big Solid Charcoal Master Play/Pause */}
             <button
               onClick={handleTogglePlay}
-              className="w-13 h-13 sm:w-12 sm:h-12 rounded-full bg-on-surface hover:bg-black text-white flex items-center justify-center shadow-md transition-transform active:scale-95 cursor-pointer"
+              disabled={isQueueEmpty}
+              className={`w-13 h-13 sm:w-12 sm:h-12 rounded-full bg-on-surface hover:bg-black text-white flex items-center justify-center shadow-md transition-transform active:scale-95 ${
+                isQueueEmpty ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+              }`}
               title={
-                isHost
+                isQueueEmpty
+                  ? "Queue is empty"
+                  : isHost
                   ? (isRoomPlaying ? "Pause for All" : "Play for All")
                   : (isLocallyPaused ? "Resume & Follow Room" : "Pause My Audio")
               }
               type="button"
             >
-              {isEffectivelyPlaying ? (
+              {isEffectivelyPlaying && !isQueueEmpty ? (
                 <Pause className="w-5 h-5 fill-current" />
               ) : (
                 <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -421,11 +457,11 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
             <button
               onClick={() => handleSkipSeconds(10)}
-              disabled={!isHost}
+              disabled={!isHost || isQueueEmpty}
               className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
-                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                !isHost || isQueueEmpty ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
-              title={isHost ? "Forward 10 seconds" : "Only Host can seek"}
+              title={isQueueEmpty ? "Queue is empty" : isHost ? "Forward 10 seconds" : "Only Host can seek"}
               type="button"
             >
               <RotateCw className="w-4 h-4" />
@@ -433,11 +469,11 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
             <button
               onClick={onNextTrack}
-              disabled={!isHost}
+              disabled={!isHost || isQueueEmpty}
               className={`w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-tertiary hover:bg-surface-container hover:text-on-surface transition-colors ${
-                !isHost ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                !isHost || isQueueEmpty ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
               }`}
-              title={isHost ? "Next Track" : "Only Host can skip"}
+              title={isQueueEmpty ? "Queue is empty" : isHost ? "Next Track" : "Only Host can skip"}
               type="button"
             >
               <SkipForward className="w-4 h-4" />

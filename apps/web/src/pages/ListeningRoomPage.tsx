@@ -477,8 +477,8 @@ export const ListeningRoomPage: React.FC = () => {
           roomName: room.name,
           isHost,
           isCohost,
-          currentSongTitle: currentSong?.title || "Live Stream",
-          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
+          currentSongTitle: currentSong?.title || "No Track Selected",
+          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "",
           participantId: participantId || storedParticipantId,
         })
       );
@@ -511,8 +511,8 @@ export const ListeningRoomPage: React.FC = () => {
           roomName: room.name,
           isHost,
           isCohost,
-          currentSongTitle: currentSong?.title || "Live Stream",
-          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "jfKfPfyJRdk",
+          currentSongTitle: currentSong?.title || "No Track Selected",
+          videoId: currentSong?.videoId || room.currentPlaybackState?.videoId || "",
           participantId: participantId || storedParticipantId,
         })
       );
