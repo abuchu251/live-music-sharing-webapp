@@ -49,6 +49,7 @@ export const FloatingMiniPlayer: React.FC = () => {
       socket.emit("room:leave");
     }
     setActiveRoom(null);
+    window.dispatchEvent(new Event("synctune:room_left"));
   };
 
   return (

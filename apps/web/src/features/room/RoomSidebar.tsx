@@ -38,6 +38,8 @@ export interface RoomSidebarProps {
   onTabChange?: (tab: "queue" | "participants" | "chat") => void;
   replyPrefill?: string;
   onClearReplyPrefill?: () => void;
+  currentSongIndex?: number;
+  currentSong?: QueueItem | null;
 }
 
 const EMOJI_REACTIONS = ["🔥", "☕", "🎧", "🙌", "💃"];
@@ -61,6 +63,8 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onTabChange,
   replyPrefill,
   onClearReplyPrefill,
+  currentSongIndex = 0,
+  currentSong,
 }) => {
   const canManageQueue = isHost || isCohost;
   const [internalTab, setInternalTab] = useState<"queue" | "participants" | "chat">("queue");
@@ -418,7 +422,9 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
               </div>
             ) : (
               queue.map((song, index) => {
-                const isFirstPlaying = index === 0;
+                const isCurrentlyPlaying = currentSong
+                  ? song.id === currentSong.id || song.videoId === currentSong.videoId
+                  : index === currentSongIndex;
                 return (
                   <div
                     key={song.id}
@@ -428,7 +434,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
                     className={`relative p-2.5 rounded-lg border transition-all flex items-center justify-between gap-2.5 group ${
-                      isFirstPlaying
+                      isCurrentlyPlaying
                         ? "bg-[#FFF7ED] border-primary/50 shadow-xs"
                         : draggedIndex === index
                         ? "opacity-40 scale-[0.98] border-primary bg-primary/10"
@@ -437,7 +443,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                         : "bg-surface-container-low hover:bg-surface-container border-outline-variant/60"
                     }`}
                   >
-                    {isFirstPlaying && (
+                    {isCurrentlyPlaying && (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l" />
                     )}
 
@@ -457,7 +463,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <p className={`text-xs font-semibold truncate ${isFirstPlaying ? "text-primary" : "text-on-surface"}`}>
+                        <p className={`text-xs font-semibold truncate ${isCurrentlyPlaying ? "text-primary" : "text-on-surface"}`}>
                           {song.title}
                         </p>
                         <p className="font-mono text-[10px] text-tertiary truncate">

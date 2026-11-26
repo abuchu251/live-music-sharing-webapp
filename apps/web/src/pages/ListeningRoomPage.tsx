@@ -24,8 +24,13 @@ import type { MockParticipant } from "../features/room/mockData";
 
 const DESK_AVATARS = ["🎧", "🎵", "🎸", "🎹", "🎷", "💿", "📻", "🎤", "🎛️", "☕"];
 
-export const ListeningRoomPage: React.FC = () => {
-  const { roomId = "" } = useParams<{ roomId: string }>();
+export interface ListeningRoomPageProps {
+  roomIdOverride?: string;
+}
+
+export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOverride }) => {
+  const { roomId: routeRoomId = "" } = useParams<{ roomId: string }>();
+  const roomId = roomIdOverride || routeRoomId;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -110,6 +115,11 @@ export const ListeningRoomPage: React.FC = () => {
   }, [roomId, chatMessages]);
 
   const isHost = Boolean(room && participantId && room.hostId === participantId);
+  const currentParticipant = participants.find(
+    (p) => p.id === (participantId || sessionStorage.getItem(`synctune:participantId:${roomId}`)) || p.username === username
+  );
+  const isCohost = Boolean(currentParticipant?.role === "COHOST");
+  const canControlPlayback = isHost || isCohost;
   const currentSong = queue[currentSongIndex] || null;
 
   useEffect(() => {
@@ -297,12 +307,14 @@ export const ListeningRoomPage: React.FC = () => {
           sessionStorage.removeItem("synctune:active_room");
           sessionStorage.removeItem(`synctune:participantId:${roomId}`);
           sessionStorage.removeItem(`synctune:chat:${roomId}`);
+          window.dispatchEvent(new Event("synctune:room_left"));
           alert(reason || "This room has been closed by the host.");
           navigate("/");
         });
       } catch (err: unknown) {
         if (!isMounted) return;
         sessionStorage.removeItem("synctune:active_room");
+        window.dispatchEvent(new Event("synctune:room_left"));
         setError(err instanceof Error ? err.message : "Failed to load room.");
         setIsLoading(false);
       }
@@ -325,35 +337,23 @@ export const ListeningRoomPage: React.FC = () => {
     };
   }, [roomId, username, avatar, needsNamePrompt, navigate]);
 
-  const handleNextTrack = useCallback(() => {
-    if (queue.length === 0) return;
-    if (currentSongIndex < queue.length - 1) {
-      const nextIdx = currentSongIndex + 1;
-      setCurrentSongIndex(nextIdx);
+  // Synchronize currentSongIndex whenever the room's playing videoId or queue changes
+  useEffect(() => {
+    const activeVideoId = room?.currentPlaybackState?.videoId;
+    if (!activeVideoId || queue.length === 0) return;
+    const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
+    if (matchIdx !== -1 && matchIdx !== currentSongIndex) {
+      setCurrentSongIndex(matchIdx);
       setIsPlaylistFinished(false);
-      const nextSong = queue[nextIdx];
-      if (nextSong && isHost) {
-        handleChangeVideo(nextSong.videoId, nextSong.title);
-      }
-    } else {
-      setIsPlaylistFinished(true);
     }
-  }, [queue, currentSongIndex, isHost]);
-
-  const handlePreviousTrack = useCallback(() => {
-    if (currentSongIndex > 0) {
-      const prevIdx = currentSongIndex - 1;
-      setCurrentSongIndex(prevIdx);
-      setIsPlaylistFinished(false);
-      const prevSong = queue[prevIdx];
-      if (prevSong && isHost) {
-        handleChangeVideo(prevSong.videoId, prevSong.title);
-      }
-    }
-  }, [currentSongIndex, queue, isHost]);
+  }, [room?.currentPlaybackState?.videoId, queue, currentSongIndex]);
 
   const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
     setIsPlaylistFinished(false);
+    const matchIdx = queue.findIndex((item) => item.videoId === videoId);
+    if (matchIdx !== -1) {
+      setCurrentSongIndex(matchIdx);
+    }
     const socket = getSocket();
     playbackRevisionRef.current += 1;
     socket.emit("playback:command", {
@@ -366,20 +366,69 @@ export const ListeningRoomPage: React.FC = () => {
     }, (res: { ok: boolean; error?: string }) => {
       if (!res.ok) console.error("Failed to change video on server:", res.error);
     });
-  }, []);
+  }, [queue]);
+
+  const handleNextTrack = useCallback(() => {
+    if (queue.length === 0) return;
+
+    // Anchor to the currently playing song in the queue
+    const activeVideoId = room?.currentPlaybackState?.videoId || currentSong?.videoId;
+    let baseIdx = currentSongIndex;
+    if (activeVideoId) {
+      const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
+      if (matchIdx !== -1) {
+        baseIdx = matchIdx;
+      }
+    }
+
+    if (baseIdx < queue.length - 1) {
+      const nextIdx = baseIdx + 1;
+      setCurrentSongIndex(nextIdx);
+      setIsPlaylistFinished(false);
+      const nextSong = queue[nextIdx];
+      if (nextSong && canControlPlayback) {
+        handleChangeVideo(nextSong.videoId, nextSong.title);
+      }
+    } else {
+      setIsPlaylistFinished(true);
+    }
+  }, [queue, currentSongIndex, room?.currentPlaybackState?.videoId, currentSong?.videoId, canControlPlayback, handleChangeVideo]);
+
+  const handlePreviousTrack = useCallback(() => {
+    if (queue.length === 0) return;
+
+    const activeVideoId = room?.currentPlaybackState?.videoId || currentSong?.videoId;
+    let baseIdx = currentSongIndex;
+    if (activeVideoId) {
+      const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
+      if (matchIdx !== -1) {
+        baseIdx = matchIdx;
+      }
+    }
+
+    if (baseIdx > 0) {
+      const prevIdx = baseIdx - 1;
+      setCurrentSongIndex(prevIdx);
+      setIsPlaylistFinished(false);
+      const prevSong = queue[prevIdx];
+      if (prevSong && canControlPlayback) {
+        handleChangeVideo(prevSong.videoId, prevSong.title);
+      }
+    }
+  }, [queue, currentSongIndex, room?.currentPlaybackState?.videoId, currentSong?.videoId, canControlPlayback, handleChangeVideo]);
 
   const handleReplayPlaylist = () => {
     if (queue.length === 0) return;
     setCurrentSongIndex(0);
     setIsPlaylistFinished(false);
     const firstSong = queue[0];
-    if (firstSong && isHost) {
+    if (firstSong && canControlPlayback) {
       handleChangeVideo(firstSong.videoId, firstSong.title);
     }
   };
 
   const handlePlayQueuedSong = (song: QueueItem, index: number) => {
-    if (!isHost) return;
+    if (!canControlPlayback) return;
     setCurrentSongIndex(index);
     setIsPlaylistFinished(false);
     handleChangeVideo(song.videoId, song.title);
@@ -451,6 +500,7 @@ export const ListeningRoomPage: React.FC = () => {
         sessionStorage.removeItem("synctune:active_room");
         sessionStorage.removeItem(`synctune:participantId:${roomId}`);
         sessionStorage.removeItem(`synctune:chat:${roomId}`);
+        window.dispatchEvent(new Event("synctune:room_left"));
         setShowDeleteModal(false);
         navigate("/");
       } else {
@@ -463,6 +513,7 @@ export const ListeningRoomPage: React.FC = () => {
     sessionStorage.removeItem("synctune:active_room");
     sessionStorage.removeItem(`synctune:participantId:${roomId}`);
     sessionStorage.removeItem(`synctune:chat:${roomId}`);
+    window.dispatchEvent(new Event("synctune:room_left"));
     const socket = getSocket();
     socket.emit("room:leave");
     navigate("/");
@@ -494,12 +545,6 @@ export const ListeningRoomPage: React.FC = () => {
       }
     });
   };
-
-  const currentParticipant = participants.find(
-    (p) => p.id === (participantId || sessionStorage.getItem(`synctune:participantId:${roomId}`)) || p.username === username
-  );
-  const isCohost = Boolean(currentParticipant?.role === "COHOST");
-  const canControlPlayback = isHost || isCohost;
 
   // Keep active room in sync in sessionStorage so FloatingMiniPlayer seamlessly resumes session
   useEffect(() => {
@@ -825,6 +870,8 @@ export const ListeningRoomPage: React.FC = () => {
               onTabChange={setSidebarTab}
               replyPrefill={replyPrefill}
               onClearReplyPrefill={() => setReplyPrefill("")}
+              currentSongIndex={currentSongIndex}
+              currentSong={currentSong}
             />
           </aside>
         </div>
