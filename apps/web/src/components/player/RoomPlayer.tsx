@@ -109,6 +109,16 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
   const activeVideoId = currentSong?.videoId || playbackState.videoId || "";
   const isQueueEmpty = !activeVideoId;
 
+  // Reset timeline and duration when track switches
+  useEffect(() => {
+    setCurrentTime(0);
+    if (currentSong?.duration && currentSong.duration > 0) {
+      setDuration(currentSong.duration);
+    } else {
+      setDuration(0);
+    }
+  }, [currentSong?.id, currentSong?.videoId, activeVideoId]);
+
   const handleTogglePlay = () => {
     if (isHost) {
       if (isRoomPlaying) {
@@ -125,6 +135,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
     if (!isHost) return;
     const newTime = parseFloat(e.target.value);
     setCurrentTime(newTime);
+    playerRef.current?.seekTo(newTime);
     sendSeek(newTime);
   };
 
@@ -132,6 +143,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
     if (!isHost) return;
     const targetTime = Math.max(0, Math.min(currentTime + deltaSeconds, duration || 9999));
     setCurrentTime(targetTime);
+    playerRef.current?.seekTo(targetTime);
     sendSeek(targetTime);
   };
 

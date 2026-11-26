@@ -237,6 +237,7 @@ export function usePlaybackSync({
       }
 
       const socket = getSocket();
+      localRevisionRef.current += 1;
       const command: PlaybackCommand = {
         type: commandType,
         payload,

@@ -59,9 +59,11 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     const timeIntervalRef = useRef<number | null>(null);
     const currentVideoIdRef = useRef<string>(videoId);
     currentVideoIdRef.current = videoId;
+    const isPlayerReadyRef = useRef<boolean>(false);
+    const onTimeUpdateRef = useRef(onTimeUpdate);
+    onTimeUpdateRef.current = onTimeUpdate;
 
     const [isApiLoading, setIsApiLoading] = useState(true);
-    const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [playerError, setPlayerError] = useState<string | null>(null);
     const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
@@ -73,23 +75,29 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       }
     }, []);
 
-    // Start time polling timer (fires onTimeUpdate every 500ms when playing)
+    // Broadcast current time and duration to parent callback
+    const updateTime = useCallback(() => {
+      const player = playerRef.current;
+      if (!player || !isPlayerReadyRef.current) return;
+      try {
+        const current = player.getCurrentTime() || 0;
+        const dur = player.getDuration() || 0;
+        if (onTimeUpdateRef.current) {
+          onTimeUpdateRef.current(current, dur);
+        }
+      } catch {
+        // Player may be unmounting
+      }
+    }, []);
+
+    // Start time polling timer (fires onTimeUpdate every 250ms for smooth timeline tracking)
     const startTimeTracking = useCallback(() => {
       stopTimeTracking();
+      updateTime();
       timeIntervalRef.current = window.setInterval(() => {
-        if (playerRef.current && isPlayerReady) {
-          try {
-            const current = playerRef.current.getCurrentTime() || 0;
-            const dur = playerRef.current.getDuration() || 0;
-            if (onTimeUpdate) {
-              onTimeUpdate(current, dur);
-            }
-          } catch {
-            // Player may be unmounting
-          }
-        }
-      }, 500);
-    }, [isPlayerReady, onTimeUpdate, stopTimeTracking]);
+        updateTime();
+      }, 250);
+    }, [stopTimeTracking, updateTime]);
 
     // Imperative API handle
     const playerHandle: YouTubePlayerHandle = {
@@ -97,6 +105,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         try {
           playerRef.current?.playVideo();
           setAutoplayBlocked(false);
+          startTimeTracking();
         } catch (e) {
           console.error("Failed to play video:", e);
         }
@@ -104,6 +113,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       pause: () => {
         try {
           playerRef.current?.pauseVideo();
+          updateTime();
         } catch (e) {
           console.error("Failed to pause video:", e);
         }
@@ -111,6 +121,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       seekTo: (seconds: number) => {
         try {
           playerRef.current?.seekTo(seconds, true);
+          updateTime();
         } catch (e) {
           console.error("Failed to seek video:", e);
         }
@@ -183,10 +194,11 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       if (!mount) return;
 
       // If player already initialized, just load the new video smoothly!
-      if (playerRef.current && isPlayerReady) {
+      if (playerRef.current && isPlayerReadyRef.current) {
         try {
           playerRef.current.loadVideoById(videoId, startSeconds);
           setPlayerError(null);
+          startTimeTracking();
         } catch {
           // If player was in broken state, recreate below
         }
@@ -228,7 +240,8 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
             events: {
               onReady: () => {
                 if (!isMounted) return;
-                setIsPlayerReady(true);
+                isPlayerReadyRef.current = true;
+                startTimeTracking();
                 if (onReady) onReady(playerHandle);
                 if (autoplay) {
                   try {
@@ -242,14 +255,18 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
                 if (!isMounted) return;
                 const state = event.data;
 
+                updateTime();
+
                 if (state === YT.PlayerState.PLAYING) {
                   startTimeTracking();
                   setAutoplayBlocked(false);
-                } else {
-                  stopTimeTracking();
+                } else if (state === YT.PlayerState.PAUSED) {
+                  updateTime();
                 }
 
                 if (state === YT.PlayerState.ENDED) {
+                  stopTimeTracking();
+                  updateTime();
                   if (onEnded) onEnded();
                 }
 
