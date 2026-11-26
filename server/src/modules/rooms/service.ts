@@ -404,6 +404,9 @@ export class RoomService {
     };
 
     room.queue.push(item);
+    if (!room.currentPlaybackState.videoId) {
+      room.currentPlaybackState.videoId = item.videoId;
+    }
     const updated = await this.repo.update(room);
     return { room: updated, item };
   }

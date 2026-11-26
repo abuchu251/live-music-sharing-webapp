@@ -106,7 +106,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
   const isRoomPlaying = playbackState.status === "playing";
   const isEffectivelyPlaying = isHost ? isRoomPlaying : isRoomPlaying && !isLocallyPaused;
-  const activeVideoId = currentSong?.videoId || playbackState.videoId || "";
+  const activeVideoId = playbackState.videoId || currentSong?.videoId || "";
   const isQueueEmpty = !activeVideoId;
 
   // Reset timeline and duration when track switches
@@ -124,7 +124,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
       if (isRoomPlaying) {
         sendPause();
       } else {
-        sendPlay();
+        sendPlay(currentTime, activeVideoId);
       }
     } else {
       toggleLocalPlayback();
@@ -273,6 +273,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
               <YouTubePlayer
                 ref={playerRef}
                 videoId={activeVideoId}
+                autoplay={true}
                 onTimeUpdate={(curr, dur) => {
                   setCurrentTime(curr);
                   if (dur > 0) setDuration(dur);

@@ -51,7 +51,13 @@ export class PlaybackService {
     const now = Date.now();
 
     // Reject stale commands with out-of-order or obsolete revisions
-    if (command.revision !== undefined && command.revision < current.revision) {
+    // NOTE: Explicit user track changes ("change-video", "next") must NEVER be rejected as stale!
+    if (
+      command.type !== "change-video" &&
+      command.type !== "next" &&
+      command.revision !== undefined &&
+      command.revision < current.revision
+    ) {
       console.warn(`[Playback] Rejecting stale command rev ${command.revision} (current rev ${current.revision})`);
       return current;
     }
@@ -68,8 +74,13 @@ export class PlaybackService {
             ? Math.max(0, command.payload.position)
             : current.position;
 
+        const targetVideoId =
+          command.payload?.videoId ||
+          current.videoId ||
+          (room.queue.length > 0 ? room.queue[0]?.videoId : "");
+
         nextState = {
-          videoId: command.payload?.videoId || current.videoId,
+          videoId: targetVideoId || current.videoId,
           status: "playing",
           position: targetPos,
           updatedAt: now,

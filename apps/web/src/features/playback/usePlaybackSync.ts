@@ -86,7 +86,8 @@ export function usePlaybackSync({
         setCurrentDrift(drift);
 
         // Check video track change
-        if (targetState.videoId && targetState.videoId !== playbackStateRef.current.videoId) {
+        const isTrackSwitch = Boolean(targetState.videoId && targetState.videoId !== playbackStateRef.current.videoId);
+        if (isTrackSwitch && targetState.videoId) {
           if (onTrackChangeRef.current) onTrackChangeRef.current(targetState.videoId);
           player.loadVideo(targetState.videoId, Math.floor(expectedPos));
         }
@@ -105,10 +106,12 @@ export function usePlaybackSync({
             return;
           }
 
-          // If paused locally, start playing
-          const playerState = player.getPlayerState();
-          if (playerState !== 1) { // 1 = PLAYING
-            player.play();
+          // If not switching tracks right now, ensure player is playing
+          if (!isTrackSwitch) {
+            const playerState = player.getPlayerState();
+            if (playerState !== 1 && playerState !== 3) { // 1 = PLAYING, 3 = BUFFERING
+              player.play();
+            }
           }
 
           // Drift threshold check
@@ -296,7 +299,8 @@ export function usePlaybackSync({
     isProgrammaticUpdate: isProgrammaticUpdateRef.current,
     toggleLocalPlayback,
     resyncToLive,
-    sendPlay: (position?: number) => sendHostCommand("play", { position }),
+    sendPlay: (position?: number, videoId?: string) =>
+      sendHostCommand("play", { position, videoId }),
     sendPause: (position?: number) => sendHostCommand("pause", { position }),
     sendSeek: (position: number) => sendHostCommand("seek", { position }),
     sendChangeVideo: (videoId: string, position: number = 0) =>

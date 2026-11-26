@@ -19,7 +19,7 @@ import { RoomSidebar } from "../features/room/RoomSidebar";
 import { Button } from "../components/ui/Button";
 import { getRoom } from "../services/api";
 import { connectSocket, getSocket } from "../services/socket";
-import type { Room, Participant, RoomStatus, QueueItem, ChatMessage } from "@synctune/shared-types";
+import type { Room, Participant, RoomStatus, QueueItem, ChatMessage, PlaybackState } from "@synctune/shared-types";
 import type { MockParticipant } from "../features/room/mockData";
 
 const DESK_AVATARS = ["🎧", "🎵", "🎸", "🎹", "🎷", "💿", "📻", "🎤", "🎛️", "☕"];
@@ -93,6 +93,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
   }, []);
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const queueRef = useRef<QueueItem[]>(queue);
+  queueRef.current = queue;
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     if (typeof window === "undefined" || !roomId) return [];
@@ -120,7 +122,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
   );
   const isCohost = Boolean(currentParticipant?.role === "COHOST");
   const canControlPlayback = isHost || isCohost;
-  const currentSong = queue[currentSongIndex] || null;
+  const activeVideoId = room?.currentPlaybackState?.videoId || queue[currentSongIndex]?.videoId || "";
+  const currentSong = (activeVideoId ? queue.find((item) => item.videoId === activeVideoId) : null) || queue[currentSongIndex] || null;
 
   useEffect(() => {
     if (!roomId) return;
@@ -181,8 +184,16 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
         if (fetchedRoom.participants) {
           setParticipants(fetchedRoom.participants);
         }
-        setQueue(fetchedRoom.queue || []);
+        const initialQueue = fetchedRoom.queue || [];
+        setQueue(initialQueue);
+        queueRef.current = initialQueue;
         playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision || 0;
+        if (fetchedRoom.currentPlaybackState?.videoId && initialQueue.length > 0) {
+          const matchIdx = initialQueue.findIndex((item) => item.videoId === fetchedRoom.currentPlaybackState.videoId);
+          if (matchIdx !== -1) {
+            setCurrentSongIndex(matchIdx);
+          }
+        }
 
         if (chatHistory && chatHistory.length > 0) {
           setChatMessages((prev) => {
@@ -220,12 +231,24 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
               setParticipantId(res.participantId);
               sessionStorage.setItem(`synctune:participantId:${roomId}`, res.participantId);
               if (res.room) {
-                setRoom(res.room);
-                if (res.room.participants) {
-                  setParticipants(res.room.participants);
+                const joinedRoom = res.room;
+                setRoom(joinedRoom);
+                if (joinedRoom.participants) {
+                  setParticipants(joinedRoom.participants);
                 }
-                if (res.room.queue) {
-                  setQueue(res.room.queue);
+                const activeId = joinedRoom.currentPlaybackState?.videoId;
+                if (joinedRoom.queue) {
+                  setQueue(joinedRoom.queue);
+                  queueRef.current = joinedRoom.queue;
+                  if (activeId) {
+                    const matchIdx = joinedRoom.queue.findIndex((item) => item.videoId === activeId);
+                    if (matchIdx !== -1) {
+                      setCurrentSongIndex(matchIdx);
+                    }
+                  }
+                }
+                if (joinedRoom.currentPlaybackState?.revision) {
+                  playbackRevisionRef.current = Math.max(playbackRevisionRef.current, joinedRoom.currentPlaybackState.revision);
                 }
               }
               if (res.messages && res.messages.length > 0) {
@@ -244,9 +267,33 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
           }
         );
 
+        socket.on("playback:state-update", (updatedState: PlaybackState) => {
+          if (!isMounted) return;
+          playbackRevisionRef.current = Math.max(playbackRevisionRef.current, updatedState.revision || 0);
+          setRoom((prev) => (prev ? { ...prev, currentPlaybackState: updatedState } : null));
+
+          if (updatedState.videoId) {
+            const matchIdx = queueRef.current.findIndex((item) => item.videoId === updatedState.videoId);
+            if (matchIdx !== -1) {
+              setCurrentSongIndex(matchIdx);
+              setIsPlaylistFinished(false);
+            }
+          }
+        });
+
         socket.on("queue:updated", (updatedQueue) => {
           if (!isMounted) return;
           setQueue(updatedQueue);
+          queueRef.current = updatedQueue;
+          setRoom((prev) => {
+            if (prev?.currentPlaybackState?.videoId) {
+              const matchIdx = updatedQueue.findIndex((item) => item.videoId === prev.currentPlaybackState.videoId);
+              if (matchIdx !== -1) {
+                setCurrentSongIndex(matchIdx);
+              }
+            }
+            return prev;
+          });
         });
 
         socket.on("chat:message", (newMsg) => {
@@ -327,6 +374,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
       const socket = getSocket();
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("playback:state-update");
       socket.off("queue:updated");
       socket.off("chat:message");
       socket.off("room:participant-joined");
@@ -337,25 +385,14 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     };
   }, [roomId, username, avatar, needsNamePrompt, navigate]);
 
-  // Synchronize currentSongIndex whenever the room's playing videoId or queue changes
-  useEffect(() => {
-    const activeVideoId = room?.currentPlaybackState?.videoId;
-    if (!activeVideoId || queue.length === 0) return;
-    const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
-    if (matchIdx !== -1 && matchIdx !== currentSongIndex) {
-      setCurrentSongIndex(matchIdx);
-      setIsPlaylistFinished(false);
-    }
-  }, [room?.currentPlaybackState?.videoId, queue, currentSongIndex]);
-
   const handleChangeVideo = useCallback((videoId: string, _title?: string) => {
     setIsPlaylistFinished(false);
-    const matchIdx = queue.findIndex((item) => item.videoId === videoId);
+    const matchIdx = queueRef.current.findIndex((item) => item.videoId === videoId);
     if (matchIdx !== -1) {
       setCurrentSongIndex(matchIdx);
     }
     const socket = getSocket();
-    playbackRevisionRef.current += 1;
+    playbackRevisionRef.current = Math.max(playbackRevisionRef.current, room?.currentPlaybackState?.revision || 0) + 1;
     socket.emit("playback:command", {
       type: "change-video",
       payload: {
@@ -366,41 +403,43 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     }, (res: { ok: boolean; error?: string }) => {
       if (!res.ok) console.error("Failed to change video on server:", res.error);
     });
-  }, [queue]);
+  }, [room?.currentPlaybackState?.revision]);
 
   const handleNextTrack = useCallback(() => {
-    if (queue.length === 0) return;
+    const currentQueue = queueRef.current;
+    if (currentQueue.length === 0) return;
 
     // Anchor to the currently playing song in the queue
-    const activeVideoId = room?.currentPlaybackState?.videoId || currentSong?.videoId;
+    const activeVid = room?.currentPlaybackState?.videoId || currentSong?.videoId;
     let baseIdx = currentSongIndex;
-    if (activeVideoId) {
-      const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
+    if (activeVid) {
+      const matchIdx = currentQueue.findIndex((item) => item.videoId === activeVid);
       if (matchIdx !== -1) {
         baseIdx = matchIdx;
       }
     }
 
-    if (baseIdx < queue.length - 1) {
+    if (baseIdx < currentQueue.length - 1) {
       const nextIdx = baseIdx + 1;
       setCurrentSongIndex(nextIdx);
       setIsPlaylistFinished(false);
-      const nextSong = queue[nextIdx];
+      const nextSong = currentQueue[nextIdx];
       if (nextSong && canControlPlayback) {
         handleChangeVideo(nextSong.videoId, nextSong.title);
       }
     } else {
       setIsPlaylistFinished(true);
     }
-  }, [queue, currentSongIndex, room?.currentPlaybackState?.videoId, currentSong?.videoId, canControlPlayback, handleChangeVideo]);
+  }, [room?.currentPlaybackState?.videoId, currentSong?.videoId, currentSongIndex, canControlPlayback, handleChangeVideo]);
 
   const handlePreviousTrack = useCallback(() => {
-    if (queue.length === 0) return;
+    const currentQueue = queueRef.current;
+    if (currentQueue.length === 0) return;
 
-    const activeVideoId = room?.currentPlaybackState?.videoId || currentSong?.videoId;
+    const activeVid = room?.currentPlaybackState?.videoId || currentSong?.videoId;
     let baseIdx = currentSongIndex;
-    if (activeVideoId) {
-      const matchIdx = queue.findIndex((item) => item.videoId === activeVideoId);
+    if (activeVid) {
+      const matchIdx = currentQueue.findIndex((item) => item.videoId === activeVid);
       if (matchIdx !== -1) {
         baseIdx = matchIdx;
       }
@@ -410,18 +449,19 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
       const prevIdx = baseIdx - 1;
       setCurrentSongIndex(prevIdx);
       setIsPlaylistFinished(false);
-      const prevSong = queue[prevIdx];
+      const prevSong = currentQueue[prevIdx];
       if (prevSong && canControlPlayback) {
         handleChangeVideo(prevSong.videoId, prevSong.title);
       }
     }
-  }, [queue, currentSongIndex, room?.currentPlaybackState?.videoId, currentSong?.videoId, canControlPlayback, handleChangeVideo]);
+  }, [room?.currentPlaybackState?.videoId, currentSong?.videoId, currentSongIndex, canControlPlayback, handleChangeVideo]);
 
   const handleReplayPlaylist = () => {
-    if (queue.length === 0) return;
+    const currentQueue = queueRef.current;
+    if (currentQueue.length === 0) return;
     setCurrentSongIndex(0);
     setIsPlaylistFinished(false);
-    const firstSong = queue[0];
+    const firstSong = currentQueue[0];
     if (firstSong && canControlPlayback) {
       handleChangeVideo(firstSong.videoId, firstSong.title);
     }

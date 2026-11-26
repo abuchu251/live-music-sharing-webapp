@@ -57,11 +57,21 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     const playerMountRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<YT.Player | null>(null);
     const timeIntervalRef = useRef<number | null>(null);
-    const currentVideoIdRef = useRef<string>(videoId);
-    currentVideoIdRef.current = videoId;
+    const currentLoadedVideoIdRef = useRef<string>(videoId);
+    const targetVideoIdRef = useRef<string>(videoId);
+    targetVideoIdRef.current = videoId;
     const isPlayerReadyRef = useRef<boolean>(false);
+
     const onTimeUpdateRef = useRef(onTimeUpdate);
     onTimeUpdateRef.current = onTimeUpdate;
+    const onEndedRef = useRef(onEnded);
+    onEndedRef.current = onEnded;
+    const onStateChangeRef = useRef(onStateChange);
+    onStateChangeRef.current = onStateChange;
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
 
     const [isApiLoading, setIsApiLoading] = useState(true);
     const [playerError, setPlayerError] = useState<string | null>(null);
@@ -98,6 +108,24 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         updateTime();
       }, 250);
     }, [stopTimeTracking, updateTime]);
+
+    // Load new video into existing player without tearing down iframe DOM
+    const loadVideoInternal = useCallback((targetId: string, startSec = 0) => {
+      if (!targetId) return;
+      if (currentLoadedVideoIdRef.current === targetId && isPlayerReadyRef.current) {
+        return;
+      }
+      currentLoadedVideoIdRef.current = targetId;
+      setPlayerError(null);
+      if (playerRef.current && isPlayerReadyRef.current) {
+        try {
+          playerRef.current.loadVideoById(targetId, startSec);
+          startTimeTracking();
+        } catch (e) {
+          console.error("Failed to load video into player:", e);
+        }
+      }
+    }, [startTimeTracking]);
 
     // Imperative API handle
     const playerHandle: YouTubePlayerHandle = {
@@ -148,12 +176,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         }
       },
       loadVideo: (newVideoId: string, startSec = 0) => {
-        try {
-          setPlayerError(null);
-          playerRef.current?.loadVideoById(newVideoId, startSec);
-        } catch (e) {
-          console.error("Failed to load video:", e);
-        }
+        loadVideoInternal(newVideoId, startSec);
       },
       setVolume: (vol: number) => {
         try {
@@ -187,23 +210,19 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
 
     useImperativeHandle(ref, () => playerHandle);
 
-    // Initialize YouTube Player once, then switch videos smoothly without re-mounting
+    // When videoId prop updates from parent, smoothly load it in existing iframe
+    useEffect(() => {
+      targetVideoIdRef.current = videoId;
+      if (videoId && isPlayerReadyRef.current) {
+        loadVideoInternal(videoId, startSeconds || 0);
+      }
+    }, [videoId, startSeconds, loadVideoInternal]);
+
+    // Initialize YouTube Player ONCE on component mount
     useEffect(() => {
       let isMounted = true;
       const mount = playerMountRef.current;
       if (!mount) return;
-
-      // If player already initialized, just load the new video smoothly!
-      if (playerRef.current && isPlayerReadyRef.current) {
-        try {
-          playerRef.current.loadVideoById(videoId, startSeconds);
-          setPlayerError(null);
-          startTimeTracking();
-        } catch {
-          // If player was in broken state, recreate below
-        }
-        return;
-      }
 
       // Create an isolated unmanaged child DOM element for YT to replace
       mount.innerHTML = "";
@@ -221,8 +240,11 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
           const currentOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
           const currentHref = typeof window !== "undefined" ? window.location.href : undefined;
 
+          const initialVideoId = targetVideoIdRef.current || videoId;
+          currentLoadedVideoIdRef.current = initialVideoId;
+
           playerRef.current = new YT.Player(ytTarget, {
-            videoId,
+            videoId: initialVideoId,
             width: "100%",
             height: "100%",
             host: "https://www.youtube.com",
@@ -242,8 +264,12 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
                 if (!isMounted) return;
                 isPlayerReadyRef.current = true;
                 startTimeTracking();
-                if (onReady) onReady(playerHandle);
-                if (autoplay) {
+                if (onReadyRef.current) onReadyRef.current(playerHandle);
+
+                // If target video changed while iframe was loading, switch to it immediately
+                if (targetVideoIdRef.current && targetVideoIdRef.current !== currentLoadedVideoIdRef.current) {
+                  loadVideoInternal(targetVideoIdRef.current, 0);
+                } else if (autoplay) {
                   try {
                     playerRef.current?.playVideo();
                   } catch {
@@ -267,16 +293,16 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
                 if (state === YT.PlayerState.ENDED) {
                   stopTimeTracking();
                   updateTime();
-                  if (onEnded) onEnded();
+                  if (onEndedRef.current) onEndedRef.current();
                 }
 
-                if (onStateChange) onStateChange(state);
+                if (onStateChangeRef.current) onStateChangeRef.current(state);
               },
               onError: (event) => {
                 if (!isMounted) return;
                 const message = getYouTubeErrorMessage(event.data);
                 setPlayerError(message);
-                if (onError) onError(message, event.data);
+                if (onErrorRef.current) onErrorRef.current(message, event.data);
               },
               onAutoplayBlocked: () => {
                 if (!isMounted) return;
@@ -289,11 +315,12 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
           if (!isMounted) return;
           setIsApiLoading(false);
           setPlayerError(err.message);
-          if (onError) onError(err.message, -1);
+          if (onErrorRef.current) onErrorRef.current(err.message, -1);
         });
 
       return () => {
         isMounted = false;
+        isPlayerReadyRef.current = false;
         stopTimeTracking();
         try {
           playerRef.current?.destroy();
@@ -305,7 +332,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
           mount.innerHTML = "";
         }
       };
-    }, [videoId]);
+    }, []); // Run once on mount!
 
     return (
       <div
