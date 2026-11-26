@@ -83,6 +83,32 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
   const [sidebarTab, setSidebarTab] = useState<"queue" | "participants" | "chat">("queue");
   const [replyPrefill, setReplyPrefill] = useState<string>("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [cohostRequest, setCohostRequest] = useState<{
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatar: string;
+  } | null>(null);
+  const [cohostRequestSent, setCohostRequestSent] = useState(false);
+  const [toastReplyActive, setToastReplyActive] = useState(false);
+  const [toastReplyText, setToastReplyText] = useState("");
+  const [cohostReplyActive, setCohostReplyActive] = useState(false);
+  const [cohostReplyText, setCohostReplyText] = useState("");
+
+  // Listen for background quick replies from desktop/Chrome notifications via Service Worker
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "NOTIFICATION_REPLY" && event.data?.content) {
+        const socket = getSocket();
+        socket.emit("chat:send", { content: event.data.content }, () => {});
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -281,6 +307,11 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
           }
         });
 
+        socket.on("playback:queue-ended", (data: { ended: boolean }) => {
+          if (!isMounted) return;
+          setIsPlaylistFinished(data.ended);
+        });
+
         socket.on("queue:updated", (updatedQueue) => {
           if (!isMounted) return;
           setQueue(updatedQueue);
@@ -305,16 +336,50 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
 
           if (newMsg.senderUsername !== username) {
             setChatToast(newMsg);
+            setToastReplyActive(false);
+            setToastReplyText("");
 
             if (typeof document !== "undefined" && document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
-              try {
-                new Notification(`New message from ${newMsg.senderUsername}`, {
-                  body: formatChatContent(newMsg.content).slice(0, 80),
-                  icon: "/favicon.svg",
+              const body = formatChatContent(newMsg.content).slice(0, 100);
+              if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then((reg) => {
+                  try {
+                    const opts: any = {
+                      body,
+                      icon: "/favicon.svg",
+                      data: { roomId, senderUsername: newMsg.senderUsername },
+                      actions: [
+                        { action: "reply", title: "Reply", type: "text", placeholder: "Type a reply..." },
+                      ],
+                    };
+                    reg.showNotification(`New message from ${newMsg.senderUsername}`, opts);
+                  } catch {
+                    new Notification(`New message from ${newMsg.senderUsername}`, { body, icon: "/favicon.svg" });
+                  }
                 });
-              } catch {}
+              } else {
+                try {
+                  new Notification(`New message from ${newMsg.senderUsername}`, {
+                    body,
+                    icon: "/favicon.svg",
+                  });
+                } catch {}
+              }
             }
           }
+        });
+
+        socket.on("room:cohost-requested", (req) => {
+          if (!isMounted) return;
+          setRoom((prev) => {
+            const currentUserId = participantId || sessionStorage.getItem(`synctune:participantId:${roomId}`);
+            if (prev && prev.hostId === currentUserId) {
+              setCohostRequest(req);
+              setCohostReplyActive(false);
+              setCohostReplyText("");
+            }
+            return prev;
+          });
         });
 
         socket.on("room:participant-joined", (p: Participant) => {
@@ -375,11 +440,13 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
       socket.off("connect");
       socket.off("disconnect");
       socket.off("playback:state-update");
+      socket.off("playback:queue-ended");
       socket.off("queue:updated");
       socket.off("chat:message");
       socket.off("room:participant-joined");
       socket.off("room:participant-left");
       socket.off("room:participant-updated");
+      socket.off("room:cohost-requested");
       socket.off("room:status-changed");
       socket.off("room:closed");
     };
@@ -392,6 +459,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
       setCurrentSongIndex(matchIdx);
     }
     const socket = getSocket();
+    socket.emit("playback:queue-ended", { ended: false });
     playbackRevisionRef.current = Math.max(playbackRevisionRef.current, room?.currentPlaybackState?.revision || 0) + 1;
     socket.emit("playback:command", {
       type: "change-video",
@@ -429,6 +497,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
       }
     } else {
       setIsPlaylistFinished(true);
+      const socket = getSocket();
+      socket.emit("playback:queue-ended", { ended: true });
     }
   }, [room?.currentPlaybackState?.videoId, currentSong?.videoId, currentSongIndex, canControlPlayback, handleChangeVideo]);
 
@@ -461,6 +531,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     if (currentQueue.length === 0) return;
     setCurrentSongIndex(0);
     setIsPlaylistFinished(false);
+    const socket = getSocket();
+    socket.emit("playback:queue-ended", { ended: false });
     const firstSong = currentQueue[0];
     if (firstSong && canControlPlayback) {
       handleChangeVideo(firstSong.videoId, firstSong.title);
@@ -474,9 +546,20 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     handleChangeVideo(song.videoId, song.title);
   };
 
-  const handleAddSong = (title: string, videoId: string) => {
+  const handleRequestCohost = () => {
     const socket = getSocket();
-    socket.emit("queue:add", { videoId, title }, (res) => {
+    setCohostRequestSent(true);
+    socket.emit("room:request-cohost", (res) => {
+      if (!res?.ok) {
+        setCohostRequestSent(false);
+        alert(res?.error || "Failed to request co-host.");
+      }
+    });
+  };
+
+  const handleAddSong = (title: string, videoId: string, duration?: number) => {
+    const socket = getSocket();
+    socket.emit("queue:add", { videoId, title, duration }, (res) => {
       if (!res.ok) {
         alert(res.error || "Failed to add song to queue.");
       }
@@ -794,8 +877,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
               </button>
             ) : (
               <button
-                onClick={handleExplicitLeave}
-                className="px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-tertiary hover:text-on-surface border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setShowLeaveModal(true)}
+                className="px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container-lowest hover:bg-error/10 hover:text-error text-tertiary border border-outline-variant text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Leave room"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -906,6 +989,8 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
               onSendMessage={handleSendMessage}
               onPlaySong={handlePlayQueuedSong}
               onSetRole={handleSetRole}
+              onRequestCohost={handleRequestCohost}
+              cohostRequestSent={cohostRequestSent}
               activeTab={sidebarTab}
               onTabChange={setSidebarTab}
               replyPrefill={replyPrefill}
@@ -917,9 +1002,9 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
         </div>
       </main>
 
-      {/* Floating Chat Notification Toast */}
+      {/* Floating Chat Notification Toast with Inline Quick Reply */}
       {chatToast && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl bg-surface-container-lowest border border-outline-variant p-4 shadow-xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-80 rounded-xl bg-surface-container-lowest border border-outline-variant p-3.5 shadow-xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
           <div className="text-2xl shrink-0">{chatToast.senderAvatar || "💬"}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
@@ -937,19 +1022,133 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
             <p className="text-xs text-tertiary truncate mt-0.5">
               {formatChatContent(chatToast.content)}
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setReplyPrefill(`@${chatToast.senderUsername} `);
-                  setSidebarTab("chat");
+
+            {toastReplyActive ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const clean = toastReplyText.trim();
+                  if (!clean) return;
+                  const socket = getSocket();
+                  socket.emit("chat:send", { content: `@${chatToast.senderUsername} ${clean}` }, () => {});
                   setChatToast(null);
+                  setToastReplyActive(false);
+                  setToastReplyText("");
                 }}
-                className="px-2.5 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
+                className="mt-2.5 flex items-center gap-1.5"
               >
-                <MessageSquare className="w-3 h-3" />
-                Reply
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={`Reply to @${chatToast.senderUsername}...`}
+                  value={toastReplyText}
+                  onChange={(e) => setToastReplyText(e.target.value)}
+                  className="flex-1 px-2 py-1 text-xs bg-surface-container rounded border border-outline-variant focus:outline-none focus:border-primary text-on-surface"
+                />
+                <button
+                  type="submit"
+                  disabled={!toastReplyText.trim()}
+                  className="px-2.5 py-1 text-xs font-semibold bg-primary hover:bg-primary-container disabled:opacity-40 text-white rounded transition-colors cursor-pointer"
+                >
+                  Send
+                </button>
+              </form>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => setToastReplyActive(true)}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  Reply
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Co-Host Request Notification Toast (Host only) */}
+      {cohostRequest && (
+        <div className="fixed bottom-6 left-6 z-50 max-w-sm w-80 rounded-xl bg-surface-container-lowest border border-outline-variant p-3.5 shadow-xl flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="text-2xl shrink-0">{cohostRequest.requesterAvatar || "🎧"}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-on-surface truncate">
+                Co-Host Request
+              </span>
+              <button
+                onClick={() => setCohostRequest(null)}
+                className="text-tertiary hover:text-on-surface text-xs cursor-pointer"
+                title="Dismiss"
+              >
+                ✕
               </button>
             </div>
+            <p className="text-xs text-on-surface mt-0.5">
+              <strong className="text-primary font-semibold">@{cohostRequest.requesterUsername}</strong> requested to become a Co-Host.
+            </p>
+
+            {cohostReplyActive ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const clean = cohostReplyText.trim();
+                  if (!clean) return;
+                  const socket = getSocket();
+                  socket.emit("chat:send", { content: `@${cohostRequest.requesterUsername} ${clean}` }, () => {});
+                  setCohostReplyActive(false);
+                  setCohostReplyText("");
+                  setCohostRequest(null);
+                }}
+                className="mt-2.5 flex items-center gap-1.5"
+              >
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={`Reply to @${cohostRequest.requesterUsername}...`}
+                  value={cohostReplyText}
+                  onChange={(e) => setCohostReplyText(e.target.value)}
+                  className="flex-1 px-2 py-1 text-xs bg-surface-container rounded border border-outline-variant focus:outline-none focus:border-primary text-on-surface"
+                />
+                <button
+                  type="submit"
+                  disabled={!cohostReplyText.trim()}
+                  className="px-2.5 py-1 text-xs font-semibold bg-primary hover:bg-primary-container disabled:opacity-40 text-white rounded transition-colors cursor-pointer"
+                >
+                  Send
+                </button>
+              </form>
+            ) : (
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSetRole(cohostRequest.requesterId, "COHOST");
+                    setCohostRequest(null);
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shadow-xs cursor-pointer transition-colors flex items-center gap-1"
+                >
+                  <Crown className="w-3 h-3" />
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCohostReplyActive(true)}
+                  className="px-2.5 py-1 text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant rounded shadow-xs cursor-pointer transition-colors flex items-center gap-1"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  Reply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCohostRequest(null)}
+                  className="px-2 py-1 text-[11px] font-semibold text-tertiary hover:text-error transition-colors cursor-pointer"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -981,6 +1180,41 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
                 className="flex-1 py-2 text-xs font-semibold rounded-lg bg-error hover:bg-error/90 text-white shadow-xs transition-colors cursor-pointer"
               >
                 Delete Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Listener Leave Room Confirmation Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#18181b]/40 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-container-lowest border border-outline-variant p-6 shadow-2xl space-y-4">
+            <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center text-error">
+              <LogOut className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-on-surface">Leave this Room?</h3>
+              <p className="text-xs text-tertiary leading-relaxed">
+                Are you sure you want to leave &quot;{room.name}&quot;? You will disconnect from the live listening session.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaveModal(false)}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-surface border border-outline-variant text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLeaveModal(false);
+                  handleExplicitLeave();
+                }}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-error hover:bg-error/90 text-white shadow-xs transition-colors cursor-pointer"
+              >
+                Leave Room
               </button>
             </div>
           </div>

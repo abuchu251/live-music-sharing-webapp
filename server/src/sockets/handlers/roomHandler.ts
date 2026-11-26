@@ -189,6 +189,32 @@ export function registerRoomHandlers(
     }
   });
 
+  // Listener requests to be promoted to Co-Host
+  socket.on("room:request-cohost", async (callback) => {
+    const { roomId, participantId, username, avatar, role } = socket.data;
+    if (!roomId || !participantId) {
+      if (callback) callback({ ok: false, error: "You must join a room first." });
+      return;
+    }
+
+    if (role === "HOST" || role === "COHOST") {
+      if (callback) callback({ ok: false, error: "You already have host privileges." });
+      return;
+    }
+
+    try {
+      io.to(roomId).emit("room:cohost-requested", {
+        requesterId: participantId,
+        requesterUsername: username || "Listener",
+        requesterAvatar: avatar || "🎧",
+      });
+      if (callback) callback({ ok: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send co-host request.";
+      if (callback) callback({ ok: false, error: msg });
+    }
+  });
+
   // Socket disconnected (tab closed, network dropped)
   socket.on("disconnect", async (reason) => {
     const { roomId, participantId, username } = socket.data;

@@ -73,6 +73,13 @@ export function registerPlaybackHandlers(
     }
   });
 
+  // Handle queue completion broadcast
+  socket.on("playback:queue-ended", (data) => {
+    const { roomId } = socket.data;
+    if (!roomId) return;
+    io.to(roomId).emit("playback:queue-ended", data);
+  });
+
   // Handle client clock synchronization (NTP style ping/pong)
   socket.on("sync:time", (_clientSendTime, callback) => {
     callback({ serverTime: Date.now() });

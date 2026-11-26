@@ -8,6 +8,17 @@ export interface YouTubeSearchResult {
   title: string;
   channelTitle: string;
   thumbnailUrl: string;
+  duration?: number;
+}
+
+export function parseYouTubeDuration(isoDuration: string): number {
+  if (!isoDuration) return 0;
+  const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1] || "0", 10);
+  const minutes = parseInt(match[2] || "0", 10);
+  const seconds = parseInt(match[3] || "0", 10);
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 // 15-minute query cache to prevent redundant quota usage
@@ -41,9 +52,43 @@ youtubeRouter.get("/search", async (req: Request, res: Response) => {
     return;
   }
 
-  // 1. Direct YouTube link check (Zero API quota cost)
+  // 1. Direct YouTube link check
   const directId = extractYouTubeId(query);
   if (directId) {
+    if (env.youtubeApiKey) {
+      try {
+        const vidUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${directId}&key=${env.youtubeApiKey}`;
+        const vidRes = await fetch(vidUrl, { signal: AbortSignal.timeout(4000) });
+        if (vidRes.ok) {
+          const vidData = (await vidRes.json()) as {
+            items?: Array<{
+              snippet?: { title?: string; channelTitle?: string };
+              contentDetails?: { duration?: string };
+            }>;
+          };
+          const item = vidData.items?.[0];
+          if (item) {
+            const dur = parseYouTubeDuration(item.contentDetails?.duration || "");
+            res.json({
+              ok: true,
+              results: [
+                {
+                  videoId: directId,
+                  title: cleanHtmlEntities(item.snippet?.title || `YouTube Video (${directId})`),
+                  channelTitle: cleanHtmlEntities(item.snippet?.channelTitle || "YouTube Creator"),
+                  thumbnailUrl: `https://img.youtube.com/vi/${directId}/hqdefault.jpg`,
+                  duration: dur > 0 ? dur : undefined,
+                },
+              ],
+            });
+            return;
+          }
+        }
+      } catch {
+        // Fallback to oEmbed below
+      }
+    }
+
     try {
       const oembedRes = await fetch(
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${directId}&format=json`,
@@ -126,6 +171,32 @@ youtubeRouter.get("/search", async (req: Request, res: Response) => {
       }>;
     };
 
+    const videoIds = (data.items || [])
+      .map((item) => item.id?.videoId)
+      .filter((id): id is string => Boolean(id))
+      .join(",");
+
+    const durationMap = new Map<string, number>();
+    if (videoIds && env.youtubeApiKey) {
+      try {
+        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${env.youtubeApiKey}`;
+        const detailsRes = await fetch(detailsUrl, { signal: AbortSignal.timeout(4000) });
+        if (detailsRes.ok) {
+          const detailsData = (await detailsRes.json()) as {
+            items?: Array<{ id?: string; contentDetails?: { duration?: string } }>;
+          };
+          for (const item of detailsData.items || []) {
+            if (item.id && item.contentDetails?.duration) {
+              const dur = parseYouTubeDuration(item.contentDetails.duration);
+              if (dur > 0) durationMap.set(item.id, dur);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[YouTube API] Failed to fetch contentDetails for search results:", err);
+      }
+    }
+
     const results: YouTubeSearchResult[] = (data.items || [])
       .filter((item) => Boolean(item.id?.videoId))
       .map((item) => ({
@@ -136,6 +207,7 @@ youtubeRouter.get("/search", async (req: Request, res: Response) => {
           item.snippet?.thumbnails?.medium?.url ||
           item.snippet?.thumbnails?.default?.url ||
           `https://img.youtube.com/vi/${item.id!.videoId!}/hqdefault.jpg`,
+        duration: durationMap.get(item.id!.videoId!),
       }));
 
     // Cache results (max 100 queries)

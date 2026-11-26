@@ -36,6 +36,7 @@ export function registerSocialHandlers(
         participant,
         videoId: data.videoId,
         title: data.title,
+        duration: data.duration,
       });
 
       callback({ ok: true, queueItem: item });
@@ -45,6 +46,25 @@ export function registerSocialHandlers(
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to add song to queue.";
       callback({ ok: false, error: msg });
+    }
+  });
+
+  // Handle live duration sync from YouTube player
+  socket.on("queue:update-duration", async (data) => {
+    const { roomId } = socket.data;
+    if (!roomId || !data?.videoId || !data?.duration || data.duration <= 0) return;
+
+    try {
+      const updatedRoom = await roomService.updateQueueItemDuration(
+        roomId,
+        data.videoId,
+        Math.round(data.duration)
+      );
+      if (updatedRoom) {
+        io.to(roomId).emit("queue:updated", updatedRoom.queue);
+      }
+    } catch (err) {
+      console.error("[Queue] Error updating duration:", err);
     }
   });
 

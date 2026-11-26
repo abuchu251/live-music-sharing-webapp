@@ -9,6 +9,7 @@ import { createInitialPlaybackState } from "@synctune/shared-types";
 import { IRoomRepository, roomRepository } from "./repository.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
+import { parseYouTubeDuration } from "../youtube/routes.js";
 
 const DEMO_ROOM_CONFIGS: Record<
   string,
@@ -375,6 +376,7 @@ export class RoomService {
     participant: Participant;
     videoId: string;
     title?: string;
+    duration?: number;
   }): Promise<{ room: Room; item: QueueItem }> {
     const { roomId, participant, videoId, title } = params;
     const room = await this.getRoom(roomId);
@@ -388,12 +390,40 @@ export class RoomService {
       );
     }
 
+    let songDuration = params.duration && params.duration > 0 ? params.duration : 0;
+    let songTitle = title;
+
+    // If duration not provided, try to fetch from YouTube API if key is present
+    if (!songDuration && env.youtubeApiKey) {
+      try {
+        const vidUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${env.youtubeApiKey}`;
+        const vidRes = await fetch(vidUrl, { signal: AbortSignal.timeout(3000) });
+        if (vidRes.ok) {
+          const vidData = (await vidRes.json()) as {
+            items?: Array<{
+              snippet?: { title?: string };
+              contentDetails?: { duration?: string };
+            }>;
+          };
+          const vItem = vidData.items?.[0];
+          if (vItem) {
+            if (!songTitle) songTitle = vItem.snippet?.title;
+            if (vItem.contentDetails?.duration) {
+              songDuration = parseYouTubeDuration(vItem.contentDetails.duration);
+            }
+          }
+        }
+      } catch {
+        // Continue with duration = 0
+      }
+    }
+
     const item: QueueItem = {
       id: `queue-${nanoid(8)}`,
       videoId,
-      title: title || `YouTube Track (${videoId})`,
+      title: songTitle || `YouTube Track (${videoId})`,
       artist: "YouTube Stream",
-      duration: 215,
+      duration: songDuration,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
       addedBy: {
         participantId: participant.id,
@@ -409,6 +439,24 @@ export class RoomService {
     }
     const updated = await this.repo.update(room);
     return { room: updated, item };
+  }
+
+  /**
+   * Updates duration of a queue track when verified by the player.
+   */
+  async updateQueueItemDuration(roomId: string, videoId: string, duration: number): Promise<Room | null> {
+    const room = await this.getRoom(roomId);
+    let modified = false;
+    for (const item of room.queue) {
+      if (item.videoId === videoId && (!item.duration || item.duration === 215 || Math.abs(item.duration - duration) > 1)) {
+        item.duration = duration;
+        modified = true;
+      }
+    }
+    if (modified) {
+      return await this.repo.update(room);
+    }
+    return room;
   }
 
   /**

@@ -19,6 +19,7 @@ import {
 import { YouTubePlayer, type YouTubePlayerHandle } from "./YouTubePlayer";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { usePlaybackSync } from "../../features/playback/usePlaybackSync";
+import { getSocket } from "../../services/socket";
 import type { SongItem } from "../../features/room/mockData";
 import type { PlaybackState, QueueItem } from "@synctune/shared-types";
 
@@ -56,6 +57,7 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(currentSong?.duration || 0);
+  const reportedDurationsRef = useRef<Set<string>>(new Set());
   const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
@@ -276,7 +278,17 @@ export const RoomPlayer: React.FC<RoomPlayerProps> = ({
                 autoplay={true}
                 onTimeUpdate={(curr, dur) => {
                   setCurrentTime(curr);
-                  if (dur > 0) setDuration(dur);
+                  if (dur > 0) {
+                    setDuration(dur);
+                    if (isHost && activeVideoId && !reportedDurationsRef.current.has(activeVideoId)) {
+                      reportedDurationsRef.current.add(activeVideoId);
+                      const socket = getSocket();
+                      socket.emit("queue:update-duration", {
+                        videoId: activeVideoId,
+                        duration: Math.round(dur),
+                      });
+                    }
+                  }
                 }}
                 onEnded={() => {
                   if (isHost && onNextTrack && autoPlayQueue) onNextTrack();

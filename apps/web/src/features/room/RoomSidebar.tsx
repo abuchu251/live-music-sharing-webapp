@@ -28,12 +28,14 @@ export interface RoomSidebarProps {
   queue: QueueItem[];
   participants: MockParticipant[];
   chatMessages: ChatMessage[];
-  onAddSong: (title: string, videoId: string) => void;
+  onAddSong: (title: string, videoId: string, duration?: number) => void;
   onRemoveSong: (songId: string) => void;
   onSendMessage: (content: string) => void;
   onPlaySong?: (song: QueueItem, index: number) => void;
   onReorderQueue?: (newQueue: QueueItem[]) => void;
   onSetRole?: (participantId: string, role: "COHOST" | "LISTENER") => void;
+  onRequestCohost?: () => void;
+  cohostRequestSent?: boolean;
   activeTab?: "queue" | "participants" | "chat";
   onTabChange?: (tab: "queue" | "participants" | "chat") => void;
   replyPrefill?: string;
@@ -59,6 +61,8 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   onPlaySong,
   onReorderQueue,
   onSetRole,
+  onRequestCohost,
+  cohostRequestSent = false,
   activeTab: activeTabProp,
   onTabChange,
   replyPrefill,
@@ -374,7 +378,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          onAddSong(item.title, item.videoId);
+                          onAddSong(item.title, item.videoId, item.duration);
                           setSearchResults((prev) => prev.filter((r) => r.videoId !== item.videoId));
                         }}
                         className="px-2 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded shrink-0 cursor-pointer flex items-center gap-1"
@@ -474,7 +478,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="font-mono text-xs text-tertiary">
-                        {formatSeconds(song.duration || 210)}
+                        {song.duration && song.duration > 0 ? formatSeconds(song.duration) : "—:—"}
                       </span>
 
                       {canManageQueue && onPlaySong && (
@@ -514,9 +518,26 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
             <span className="font-mono text-[11px] uppercase tracking-wider text-tertiary font-bold">
               Connected Coworkers ({participants.filter((p) => p.status !== "offline").length})
             </span>
-            <span className="font-mono text-[11px] text-secondary font-semibold">
-              All Synced
-            </span>
+            {!isHost && !isCohost && onRequestCohost ? (
+              <button
+                type="button"
+                onClick={onRequestCohost}
+                disabled={cohostRequestSent}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all border flex items-center gap-1 cursor-pointer ${
+                  cohostRequestSent
+                    ? "bg-secondary/10 border-secondary/30 text-secondary cursor-default"
+                    : "bg-[#FFF7ED] border-primary/40 text-primary hover:bg-primary hover:text-white"
+                }`}
+                title="Ask the host to grant you Co-Host privileges"
+              >
+                <Crown className="w-3 h-3" />
+                <span>{cohostRequestSent ? "Request Sent ✓" : "Request Co-Host"}</span>
+              </button>
+            ) : (
+              <span className="font-mono text-[11px] text-secondary font-semibold">
+                All Synced
+              </span>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">

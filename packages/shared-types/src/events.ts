@@ -29,16 +29,20 @@ export interface ClientToServerEvents {
     data: { targetParticipantId: string; role: "COHOST" | "LISTENER" },
     callback: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "room:request-cohost": (
+    callback?: (response: { ok: boolean; error?: string }) => void
+  ) => void;
 
   // Playback events (host only)
   "playback:command": (
     command: PlaybackCommand,
     callback: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "playback:queue-ended": (data: { ended: boolean }) => void;
 
   // Queue events
   "queue:add": (
-    data: { videoId: string; title?: string },
+    data: { videoId: string; title?: string; duration?: number },
     callback: (response: { ok: boolean; queueItem?: QueueItem; error?: string }) => void
   ) => void;
   "queue:remove": (
@@ -49,6 +53,7 @@ export interface ClientToServerEvents {
     data: { queueItemIds: string[] },
     callback: (response: { ok: boolean; error?: string }) => void
   ) => void;
+  "queue:update-duration": (data: { videoId: string; duration: number }) => void;
 
   // Chat events
   "chat:send": (
@@ -71,11 +76,17 @@ export interface ServerToClientEvents {
   "room:participant-joined": (participant: Participant) => void;
   "room:participant-left": (data: { participantId: string }) => void;
   "room:participant-updated": (participant: Participant) => void;
+  "room:cohost-requested": (data: {
+    requesterId: string;
+    requesterUsername: string;
+    requesterAvatar: string;
+  }) => void;
   "room:status-changed": (data: { status: Room["status"] }) => void;
   "room:closed": (data: { reason: string }) => void;
 
   // Playback events
   "playback:state-update": (state: PlaybackState) => void;
+  "playback:queue-ended": (data: { ended: boolean }) => void;
 
   // Queue events
   "queue:updated": (queue: QueueItem[]) => void;
