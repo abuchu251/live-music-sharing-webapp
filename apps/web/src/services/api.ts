@@ -4,6 +4,7 @@ import type {
   JoinRoomRequest,
   JoinRoomResponse,
   Room,
+  ChatMessage,
   User,
   AuthSessionUser,
   AuthResponse,
@@ -74,8 +75,8 @@ export async function createRoom(data: CreateRoomRequest): Promise<CreateRoomRes
   });
 }
 
-export async function getRoom(roomId: string): Promise<{ room: Room }> {
-  return request<{ room: Room }>(`/rooms/${roomId}`);
+export async function getRoom(roomId: string): Promise<{ room: Room; chatHistory?: ChatMessage[] }> {
+  return request<{ room: Room; chatHistory?: ChatMessage[] }>(`/rooms/${roomId}`);
 }
 
 export async function joinRoom(

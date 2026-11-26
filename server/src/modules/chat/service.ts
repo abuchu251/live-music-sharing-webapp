@@ -1,21 +1,78 @@
 import { nanoid } from "nanoid";
 import type { ChatMessage } from "@synctune/shared-types";
 import { AppError } from "../../middleware/errorHandler.js";
+import { prisma, isDatabaseReady } from "../../db/prisma.js";
 
 // Rate limiter state: Map<participantId, timestamp[]>
 const rateLimitMap = new Map<string, number[]>();
 
 export class ChatService {
+  // In-memory message store: Map<roomId, ChatMessage[]>
+  // Keeps up to 100 recent messages per room for fast retrieval and lightweight footprint
+  private roomMessages = new Map<string, ChatMessage[]>();
+
   /**
-   * Sanitizes message content to prevent HTML / script injection attacks.
+   * Sanitizes message content while preserving natural punctuation like apostrophes.
    */
   private sanitizeContent(raw: string): string {
     return raw
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/"/g, "&quot;");
+  }
+
+  /**
+   * Adds a message to the in-memory room buffer (capped at 100 messages).
+   */
+  addMessageToRoom(roomId: string, message: ChatMessage): void {
+    const list = this.roomMessages.get(roomId) || [];
+    list.push(message);
+    if (list.length > 100) {
+      list.shift();
+    }
+    this.roomMessages.set(roomId, list);
+
+    // Asynchronously persist to PostgreSQL if DB connection is active
+    if (isDatabaseReady()) {
+      prisma.chatMessage
+        .create({
+          data: {
+            id: message.id,
+            roomId,
+            senderId: message.senderId,
+            senderUsername: message.senderUsername,
+            senderAvatar: message.senderAvatar,
+            content: message.content,
+            isHost: message.isHost,
+            createdAt: new Date(message.timestamp),
+          },
+        })
+        .catch((err) => {
+          console.warn(`[ChatService] Failed to persist message to DB:`, err?.message || err);
+        });
+    }
+  }
+
+  /**
+   * Adds a system announcement message to the room chat history.
+   */
+  addSystemMessage(message: ChatMessage): void {
+    this.addMessageToRoom(message.roomId, message);
+  }
+
+  /**
+   * Retrieves recent messages for a room.
+   */
+  getMessages(roomId: string): ChatMessage[] {
+    return this.roomMessages.get(roomId) || [];
+  }
+
+  /**
+   * Clears in-memory messages when a room is permanently closed.
+   */
+  clearRoom(roomId: string): void {
+    this.roomMessages.delete(roomId);
   }
 
   /**
@@ -59,7 +116,7 @@ export class ChatService {
     validTimestamps.push(now);
     rateLimitMap.set(senderId, validTimestamps);
 
-    return {
+    const message: ChatMessage = {
       id: `chat-${nanoid(8)}`,
       roomId,
       senderId,
@@ -69,8 +126,10 @@ export class ChatService {
       timestamp: now,
       isHost,
     };
+
+    this.addMessageToRoom(roomId, message);
+    return message;
   }
 }
 
 export const chatService = new ChatService();
-

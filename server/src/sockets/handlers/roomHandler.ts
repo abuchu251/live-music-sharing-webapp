@@ -6,6 +6,7 @@ import type {
   SocketData,
 } from "@synctune/shared-types";
 import { roomService } from "../../modules/rooms/service.js";
+import { chatService } from "../../modules/chat/service.js";
 
 export type TypedSocket = Socket<
   ClientToServerEvents,
@@ -46,11 +47,12 @@ export function registerRoomHandlers(
         `[Socket] User "${participant.username}" (${participant.id}, ${participant.role}) joined room "${roomId}"`
       );
 
-      // Notify caller with full room snapshot
+      // Notify caller with full room snapshot and chat history
       callback({
         ok: true,
         room: result.room,
         participantId: participant.id,
+        messages: chatService.getMessages(roomId),
       });
 
       // Broadcast to other participants in this room
@@ -112,6 +114,7 @@ export function registerRoomHandlers(
 
     try {
       await roomService.closeRoom(roomId, participantId);
+      chatService.clearRoom(roomId);
 
       // Broadcast room:closed event to ALL participants in the room
       io.to(roomId).emit("room:closed", { reason: "The host has closed and deleted this room." });
@@ -174,6 +177,7 @@ export function registerRoomHandlers(
         timestamp: Date.now(),
         isHost: true,
       };
+      chatService.addSystemMessage(systemMessage);
       io.to(roomId).emit("chat:message", systemMessage);
 
       console.log(`[Socket] Host ${participantId} changed role of ${participant.username} to ${newRole}`);

@@ -50,6 +50,12 @@ export class PlaybackService {
     const current = room.currentPlaybackState;
     const now = Date.now();
 
+    // Reject stale commands with out-of-order or obsolete revisions
+    if (command.revision !== undefined && command.revision < current.revision) {
+      console.warn(`[Playback] Rejecting stale command rev ${command.revision} (current rev ${current.revision})`);
+      return current;
+    }
+
     // Advance revision sequentially so legitimate host commands are never dropped
     const nextRevision = Math.max(current.revision, command.revision || 0) + 1;
 

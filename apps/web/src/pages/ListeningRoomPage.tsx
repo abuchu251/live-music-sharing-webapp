@@ -13,6 +13,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { copyToClipboard } from "../utils/clipboard";
+import { formatChatContent } from "../utils/text";
 import { RoomPlayer } from "../components/player/RoomPlayer";
 import { RoomSidebar } from "../features/room/RoomSidebar";
 import { Button } from "../components/ui/Button";
@@ -88,8 +89,25 @@ export const ListeningRoomPage: React.FC = () => {
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined" || !roomId) return [];
+    try {
+      const cached = sessionStorage.getItem(`synctune:chat:${roomId}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const playbackRevisionRef = useRef(0);
+
+  // Cache up to 100 recent messages in sessionStorage so navigating away and returning preserves chat
+  useEffect(() => {
+    if (roomId && chatMessages.length > 0) {
+      try {
+        sessionStorage.setItem(`synctune:chat:${roomId}`, JSON.stringify(chatMessages.slice(-100)));
+      } catch {}
+    }
+  }, [roomId, chatMessages]);
 
   const isHost = Boolean(room && participantId && room.hostId === participantId);
   const currentSong = queue[currentSongIndex] || null;
@@ -97,8 +115,16 @@ export const ListeningRoomPage: React.FC = () => {
   useEffect(() => {
     if (!roomId) return;
     getRoom(roomId)
-      .then(({ room: fetchedRoom }) => {
+      .then(({ room: fetchedRoom, chatHistory }) => {
         setRoom(fetchedRoom);
+        if (chatHistory && chatHistory.length > 0) {
+          setChatMessages((prev) => {
+            const map = new Map<string, ChatMessage>();
+            for (const m of chatHistory) map.set(m.id, m);
+            for (const m of prev) map.set(m.id, m);
+            return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+          });
+        }
         if (needsNamePrompt) setIsLoading(false);
       })
       .catch((err) => {
@@ -138,7 +164,7 @@ export const ListeningRoomPage: React.FC = () => {
       }
 
       try {
-        const { room: fetchedRoom } = await getRoom(roomId);
+        const { room: fetchedRoom, chatHistory } = await getRoom(roomId);
         if (!isMounted) return;
 
         setRoom(fetchedRoom);
@@ -147,6 +173,15 @@ export const ListeningRoomPage: React.FC = () => {
         }
         setQueue(fetchedRoom.queue || []);
         playbackRevisionRef.current = fetchedRoom.currentPlaybackState.revision || 0;
+
+        if (chatHistory && chatHistory.length > 0) {
+          setChatMessages((prev) => {
+            const map = new Map<string, ChatMessage>();
+            for (const m of chatHistory) map.set(m.id, m);
+            for (const m of prev) map.set(m.id, m);
+            return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+          });
+        }
 
         const socket = connectSocket();
 
@@ -183,6 +218,14 @@ export const ListeningRoomPage: React.FC = () => {
                   setQueue(res.room.queue);
                 }
               }
+              if (res.messages && res.messages.length > 0) {
+                setChatMessages((prev) => {
+                  const map = new Map<string, ChatMessage>();
+                  for (const m of res.messages!) map.set(m.id, m);
+                  for (const m of prev) map.set(m.id, m);
+                  return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+                });
+              }
               setIsLoading(false);
             } else {
               setError(res.error || "Failed to join room via socket.");
@@ -209,7 +252,7 @@ export const ListeningRoomPage: React.FC = () => {
             if (typeof document !== "undefined" && document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
               try {
                 new Notification(`New message from ${newMsg.senderUsername}`, {
-                  body: newMsg.content.slice(0, 80),
+                  body: formatChatContent(newMsg.content).slice(0, 80),
                   icon: "/favicon.svg",
                 });
               } catch {}
@@ -253,6 +296,7 @@ export const ListeningRoomPage: React.FC = () => {
           if (!isMounted) return;
           sessionStorage.removeItem("synctune:active_room");
           sessionStorage.removeItem(`synctune:participantId:${roomId}`);
+          sessionStorage.removeItem(`synctune:chat:${roomId}`);
           alert(reason || "This room has been closed by the host.");
           navigate("/");
         });
@@ -406,6 +450,7 @@ export const ListeningRoomPage: React.FC = () => {
       if (res.ok) {
         sessionStorage.removeItem("synctune:active_room");
         sessionStorage.removeItem(`synctune:participantId:${roomId}`);
+        sessionStorage.removeItem(`synctune:chat:${roomId}`);
         setShowDeleteModal(false);
         navigate("/");
       } else {
@@ -417,6 +462,7 @@ export const ListeningRoomPage: React.FC = () => {
   const handleExplicitLeave = () => {
     sessionStorage.removeItem("synctune:active_room");
     sessionStorage.removeItem(`synctune:participantId:${roomId}`);
+    sessionStorage.removeItem(`synctune:chat:${roomId}`);
     const socket = getSocket();
     socket.emit("room:leave");
     navigate("/");
@@ -802,7 +848,7 @@ export const ListeningRoomPage: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-tertiary truncate mt-0.5">
-              {chatToast.content.replace(/<[^>]*>?/gm, "")}
+              {formatChatContent(chatToast.content)}
             </p>
             <div className="mt-2 flex items-center gap-2">
               <button

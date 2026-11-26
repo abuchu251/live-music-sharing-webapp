@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { roomService } from "./service.js";
+import { chatService } from "../chat/service.js";
 
 const router = Router();
 
@@ -65,7 +66,8 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
     const room = await roomService.getRoom(roomId);
-    res.json({ room });
+    const chatHistory = chatService.getMessages(roomId);
+    res.json({ room, chatHistory });
   } catch (err) {
     next(err);
   }

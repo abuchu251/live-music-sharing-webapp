@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ChatService } from "../server/src/modules/chat/service.js";
+import { formatChatContent } from "../apps/web/src/utils/text.js";
 
 describe("Room Chat Service", () => {
   const chatService = new ChatService();
@@ -35,6 +36,8 @@ describe("Room Chat Service", () => {
     expect(msg.content).not.toContain("</script>");
     expect(msg.content).toContain("&lt;script&gt;");
     expect(msg.content).toContain("&lt;img src=&quot;x&quot;");
+    expect(msg.content).toContain("'xss'");
+    expect(msg.content).not.toContain("&#039;");
   });
 
   it("rejects empty or whitespace-only messages", () => {
@@ -82,6 +85,23 @@ describe("Room Chat Service", () => {
 
     // 4th throws 429
     expect(() => post()).toThrow("Slow down! You are sending messages too quickly");
+  });
+
+  describe("formatChatContent helper", () => {
+    it("unescapes HTML entities and entity representations to natural characters", () => {
+      expect(formatChatContent("I don&#039;t know")).toBe("I don't know");
+      expect(formatChatContent("I don&#39;t know")).toBe("I don't know");
+      expect(formatChatContent("I don%27t know")).toBe("I don't know");
+      expect(formatChatContent("&lt;3")).toBe("<3");
+      expect(formatChatContent("A &gt; B")).toBe("A > B");
+      expect(formatChatContent("&quot;rock &amp; roll&quot;")).toBe('"rock & roll"');
+    });
+
+    it("handles already unescaped natural strings without mangling them", () => {
+      expect(formatChatContent("I don't know")).toBe("I don't know");
+      expect(formatChatContent("<3 love this song")).toBe("<3 love this song");
+      expect(formatChatContent("Volume > 9000")).toBe("Volume > 9000");
+    });
   });
 });
 

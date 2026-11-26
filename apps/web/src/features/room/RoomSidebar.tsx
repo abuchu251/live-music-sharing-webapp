@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { extractYouTubeVideoId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
+import { formatChatContent } from "../../utils/text";
 import { searchYouTube, type YouTubeSearchResult } from "../../services/api";
 import type { QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "./mockData";
@@ -616,7 +617,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                           : "bg-surface-container border border-outline-variant/60 text-on-surface"
                       }`}
                     >
-                      {msg.content}
+                      {formatChatContent(msg.content)}
                     </div>
                   </div>
                 );

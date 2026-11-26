@@ -12,7 +12,14 @@ export interface ClientToServerEvents {
   // Room events
   "room:join": (
     data: { roomId: string; username: string; avatar?: string; participantId?: string },
-    callback: (response: { ok: boolean; room?: Room; participantId?: string; error?: string }) => void
+    callback: (response: {
+      ok: boolean;
+      room?: Room;
+      participantId?: string;
+      messages?: ChatMessage[];
+      chatHistory?: ChatMessage[];
+      error?: string;
+    }) => void
   ) => void;
   "room:leave": () => void;
   "room:close": (
