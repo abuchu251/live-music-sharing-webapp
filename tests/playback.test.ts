@@ -124,7 +124,32 @@ describe("Authoritative Playback Service", () => {
         type: "play",
         revision: 1,
       })
-    ).rejects.toThrow("Only the room host can control playback");
+    ).rejects.toThrow("Only the room host or co-host can control playback");
+  });
+
+  it("allows co-host to control playback and seek on timeline", async () => {
+    // Add cohost to participants and persist in repository
+    const room = await repo.findById(mockRoomId);
+    if (room) {
+      room.participants.push({
+        id: "cohost-789",
+        username: "cohost_user",
+        avatar: "⭐",
+        role: "COHOST",
+        connectedAt: Date.now(),
+        isConnected: true,
+      });
+      await repo.update(room);
+    }
+
+    const state = await service.processCommand(mockRoomId, "cohost-789", {
+      type: "seek",
+      revision: 1,
+      payload: { position: 45 },
+    });
+
+    expect(state.position).toBe(45);
+    expect(state.revision).toBe(2);
   });
 
   it("rejects commands with stale revisions", async () => {

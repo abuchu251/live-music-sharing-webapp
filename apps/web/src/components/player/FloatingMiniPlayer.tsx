@@ -17,6 +17,15 @@ export const FloatingMiniPlayer: React.FC = () => {
   const navigate = useNavigate();
   const [activeRoom, setActiveRoom] = useState<ActiveRoomData | null>(null);
 
+  // Clear active room whenever user explicitly leaves a room
+  useEffect(() => {
+    const handleRoomLeft = () => {
+      setActiveRoom(null);
+    };
+    window.addEventListener("synctune:room_left", handleRoomLeft);
+    return () => window.removeEventListener("synctune:room_left", handleRoomLeft);
+  }, []);
+
   // Poll or check active room session whenever location changes
   useEffect(() => {
     const raw = sessionStorage.getItem("synctune:active_room");

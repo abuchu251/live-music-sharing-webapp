@@ -132,6 +132,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     }
   });
   const playbackRevisionRef = useRef(0);
+  const hasLeftRef = useRef(false);
 
   // Cache up to 100 recent messages in sessionStorage so navigating away and returning preserves chat
   useEffect(() => {
@@ -416,6 +417,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
 
         socket.on("room:closed", ({ reason }: { reason: string }) => {
           if (!isMounted) return;
+          hasLeftRef.current = true;
           sessionStorage.removeItem("synctune:active_room");
           sessionStorage.removeItem(`synctune:participantId:${roomId}`);
           sessionStorage.removeItem(`synctune:chat:${roomId}`);
@@ -620,6 +622,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     const socket = getSocket();
     socket.emit("room:close", (res) => {
       if (res.ok) {
+        hasLeftRef.current = true;
         sessionStorage.removeItem("synctune:active_room");
         sessionStorage.removeItem(`synctune:participantId:${roomId}`);
         sessionStorage.removeItem(`synctune:chat:${roomId}`);
@@ -633,6 +636,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
   };
 
   const handleExplicitLeave = () => {
+    hasLeftRef.current = true;
     sessionStorage.removeItem("synctune:active_room");
     sessionStorage.removeItem(`synctune:participantId:${roomId}`);
     sessionStorage.removeItem(`synctune:chat:${roomId}`);
@@ -671,6 +675,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
 
   // Keep active room in sync in sessionStorage so FloatingMiniPlayer seamlessly resumes session
   useEffect(() => {
+    if (hasLeftRef.current) return;
     if (room && roomId && (participantId || storedParticipantId)) {
       sessionStorage.setItem(
         "synctune:active_room",

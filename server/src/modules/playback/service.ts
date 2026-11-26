@@ -38,11 +38,17 @@ export class PlaybackService {
       throw new AppError(400, "Cannot change playback in a closed room.", "ROOM_CLOSED");
     }
 
-    // Permission check: ONLY the host can control playback
-    if (room.hostId !== participantId) {
+    // Permission check: Host or Co-Host can control playback
+    const participant = room.participants.find((p) => p.id === participantId);
+    const isAuthorized =
+      room.hostId === participantId ||
+      participant?.role === "HOST" ||
+      participant?.role === "COHOST";
+
+    if (!isAuthorized) {
       throw new AppError(
         403,
-        "Unauthorized: Only the room host can control playback.",
+        "Unauthorized: Only the room host or co-host can control playback.",
         "FORBIDDEN"
       );
     }
