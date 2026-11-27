@@ -99,6 +99,13 @@ jobs:
             git pull origin main
             chmod +x ./init-ssl.sh 2>/dev/null || true
 
+            echo "Checking disk space and cleaning up unused Docker artifacts..."
+            df -h /
+            docker container prune -f || true
+            docker image prune -af || true
+            docker builder prune -af || true
+            df -h /
+
             echo "Authenticating with GitHub Container Registry..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
@@ -107,6 +114,9 @@ jobs:
 
             echo "Starting containers..."
             docker compose up -d --remove-orphans
+
+            echo "Pruning superseded Docker images..."
+            docker image prune -af || true
 
             echo "Applying database schema migrations..."
             docker exec synctune-server npx prisma db push --skip-generate
