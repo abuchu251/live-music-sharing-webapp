@@ -377,7 +377,7 @@ export class RoomService {
     videoId: string;
     title?: string;
     duration?: number;
-  }): Promise<{ room: Room; item: QueueItem }> {
+  }): Promise<{ room: Room; item: QueueItem; playbackStarted: boolean }> {
     const { roomId, participant, videoId, title } = params;
     const room = await this.getRoom(roomId);
 
@@ -433,12 +433,19 @@ export class RoomService {
       addedAt: Date.now(),
     };
 
+    const wasIdle = !room.currentPlaybackState.videoId;
     room.queue.push(item);
-    if (!room.currentPlaybackState.videoId) {
-      room.currentPlaybackState.videoId = item.videoId;
+    if (wasIdle) {
+      room.currentPlaybackState = {
+        videoId: item.videoId,
+        status: "playing",
+        position: 0,
+        updatedAt: Date.now(),
+        revision: room.currentPlaybackState.revision + 1,
+      };
     }
     const updated = await this.repo.update(room);
-    return { room: updated, item };
+    return { room: updated, item, playbackStarted: wasIdle };
   }
 
   /**

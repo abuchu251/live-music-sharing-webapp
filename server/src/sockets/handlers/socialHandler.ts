@@ -31,7 +31,7 @@ export function registerSocialHandlers(
         isConnected: true,
       };
 
-      const { room, item } = await roomService.addQueueItem({
+      const { room, item, playbackStarted } = await roomService.addQueueItem({
         roomId,
         participant,
         videoId: data.videoId,
@@ -43,6 +43,11 @@ export function registerSocialHandlers(
 
       // Broadcast updated queue to everyone in the room
       io.to(roomId).emit("queue:updated", room.queue);
+
+      // Broadcast playing state when first track auto-starts an idle room
+      if (playbackStarted) {
+        io.to(roomId).emit("playback:state-update", room.currentPlaybackState);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to add song to queue.";
       callback({ ok: false, error: msg });
