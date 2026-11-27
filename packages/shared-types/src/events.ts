@@ -21,7 +21,7 @@ export interface ClientToServerEvents {
       error?: string;
     }) => void
   ) => void;
-  "room:leave": () => void;
+  "room:leave": (data?: { roomId?: string; participantId?: string }) => void;
   "room:close": (
     callback: (response: { ok: boolean; error?: string }) => void
   ) => void;

@@ -646,13 +646,14 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
   };
 
   const handleExplicitLeave = () => {
+    const pid = participantId || storedParticipantId || sessionStorage.getItem(`synctune:participantId:${roomId}`) || undefined;
     hasLeftRef.current = true;
     sessionStorage.removeItem("synctune:active_room");
     sessionStorage.removeItem(`synctune:participantId:${roomId}`);
     sessionStorage.removeItem(`synctune:chat:${roomId}`);
-    window.dispatchEvent(new Event("synctune:room_left"));
     const socket = getSocket();
-    socket.emit("room:leave");
+    socket.emit("room:leave", { roomId, participantId: pid });
+    window.dispatchEvent(new Event("synctune:room_left"));
     navigate("/");
   };
 

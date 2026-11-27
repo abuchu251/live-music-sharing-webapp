@@ -323,6 +323,7 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         isPlayerReadyRef.current = false;
         stopTimeTracking();
         try {
+          playerRef.current?.stopVideo?.();
           playerRef.current?.destroy();
           playerRef.current = null;
         } catch {

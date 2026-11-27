@@ -10,6 +10,7 @@ interface ActiveRoomData {
   isCohost?: boolean;
   currentSongTitle: string;
   videoId: string;
+  participantId?: string;
 }
 
 export const FloatingMiniPlayer: React.FC = () => {
@@ -51,11 +52,12 @@ export const FloatingMiniPlayer: React.FC = () => {
   };
 
   const handleLeaveRoom = () => {
+    const pid = activeRoom.participantId || sessionStorage.getItem(`synctune:participantId:${activeRoom.roomId}`) || undefined;
     sessionStorage.removeItem("synctune:active_room");
     sessionStorage.removeItem(`synctune:participantId:${activeRoom.roomId}`);
     const socket = getSocket();
     if (socket.connected) {
-      socket.emit("room:leave");
+      socket.emit("room:leave", { roomId: activeRoom.roomId, participantId: pid });
     }
     setActiveRoom(null);
     window.dispatchEvent(new Event("synctune:room_left"));

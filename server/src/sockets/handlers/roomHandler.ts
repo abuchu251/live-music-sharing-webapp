@@ -70,8 +70,9 @@ export function registerRoomHandlers(
   });
 
   // Client explicitly leaves a room
-  socket.on("room:leave", async () => {
-    const { roomId, participantId } = socket.data;
+  socket.on("room:leave", async (data?: { roomId?: string; participantId?: string }) => {
+    const roomId = socket.data.roomId || data?.roomId;
+    const participantId = socket.data.participantId || data?.participantId;
     if (!roomId || !participantId) return;
 
     try {

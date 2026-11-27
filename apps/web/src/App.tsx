@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Routes, Route, useLocation } from "react-router";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AuthModal } from "./features/auth/AuthModal";
@@ -29,19 +29,32 @@ export function App() {
     return null;
   });
 
+  const lastLeftRoomRef = useRef<string | null>(null);
+
+  if (!currentRouteRoomId && lastLeftRoomRef.current) {
+    lastLeftRoomRef.current = null;
+  }
+
   // If navigating directly to a different room route, update activeRoomId synchronously
-  if (currentRouteRoomId && currentRouteRoomId !== activeRoomId) {
+  if (
+    currentRouteRoomId &&
+    currentRouteRoomId !== activeRoomId &&
+    currentRouteRoomId !== lastLeftRoomRef.current
+  ) {
     setActiveRoomId(currentRouteRoomId);
   }
 
   // Listen for room left / closed events
   useEffect(() => {
     const handleRoomLeft = () => {
+      if (currentRouteRoomId) {
+        lastLeftRoomRef.current = currentRouteRoomId;
+      }
       setActiveRoomId(null);
     };
     window.addEventListener("synctune:room_left", handleRoomLeft);
     return () => window.removeEventListener("synctune:room_left", handleRoomLeft);
-  }, []);
+  }, [currentRouteRoomId]);
 
   const isInsideRoom = Boolean(currentRouteRoomId && currentRouteRoomId === activeRoomId);
 
