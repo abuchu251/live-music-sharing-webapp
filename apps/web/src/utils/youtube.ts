@@ -71,6 +71,31 @@ export function extractYouTubeVideoId(input: string): string | null {
 }
 
 /**
+ * Extracts a YouTube playlist ID (?list=...) from a YouTube URL or standalone playlist ID.
+ */
+export function extractYouTubePlaylistId(input: string): string | null {
+  if (!input || typeof input !== "string") return null;
+  const trimmed = input.trim();
+  if (/^(PL|UU|OLAK5uy_|FL)[a-zA-Z0-9_-]{10,}$/.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const urlString =
+      trimmed.startsWith("http://") || trimmed.startsWith("https://")
+        ? trimmed
+        : `https://${trimmed}`;
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    const allowedHosts = ["youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"];
+    if (!allowedHosts.includes(hostname)) return null;
+    const listId = url.searchParams.get("list");
+    return listId && /^[a-zA-Z0-9_-]{10,}$/.test(listId) ? listId : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Maps YouTube IFrame Player error codes to actionable user messages.
  */
 export function getYouTubeErrorMessage(errorCode: number): string {

@@ -54,6 +54,41 @@ export function registerSocialHandlers(
     }
   });
 
+  // Handle batch-adding tracks from a YouTube playlist
+  socket.on("queue:add-batch", async (data, callback) => {
+    const { roomId, participantId, username, avatar, role } = socket.data;
+    if (!roomId || !participantId) {
+      callback({ ok: false, error: "Must join a room first." });
+      return;
+    }
+
+    try {
+      const participant = {
+        id: participantId,
+        username,
+        avatar,
+        role,
+        connectedAt: Date.now(),
+        isConnected: true,
+      };
+
+      const { room, addedCount, playbackStarted } = await roomService.addQueueItemsBatch({
+        roomId,
+        participant,
+        items: data.items || [],
+      });
+
+      callback({ ok: true, addedCount });
+      io.to(roomId).emit("queue:updated", room.queue);
+      if (playbackStarted) {
+        io.to(roomId).emit("playback:state-update", room.currentPlaybackState);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to import playlist.";
+      callback({ ok: false, error: msg });
+    }
+  });
+
   // Handle live duration sync from YouTube player
   socket.on("queue:update-duration", async (data) => {
     const { roomId } = socket.data;

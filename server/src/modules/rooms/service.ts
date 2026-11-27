@@ -449,6 +449,62 @@ export class RoomService {
   }
 
   /**
+   * Batch-add multiple YouTube tracks (e.g. from a playlist) in a single DB/memory update.
+   */
+  async addQueueItemsBatch(params: {
+    roomId: string;
+    participant: Participant;
+    items: Array<{ videoId: string; title?: string; duration?: number }>;
+  }): Promise<{ room: Room; addedCount: number; playbackStarted: boolean }> {
+    const { roomId, participant, items } = params;
+    const room = await this.getRoom(roomId);
+
+    if (participant.role !== "HOST" && participant.role !== "COHOST" && !room.settings.allowListenerQueue) {
+      throw new AppError(
+        403,
+        "Queueing is currently restricted to the host in this room.",
+        "QUEUE_RESTRICTED"
+      );
+    }
+
+    const bounded = items.slice(0, 50).filter((it) => Boolean(it.videoId));
+    if (bounded.length === 0) {
+      return { room, addedCount: 0, playbackStarted: false };
+    }
+
+    const wasIdle = !room.currentPlaybackState.videoId;
+    const now = Date.now();
+    const newItems: QueueItem[] = bounded.map((it, idx) => ({
+      id: `queue-${nanoid(8)}`,
+      videoId: it.videoId,
+      title: it.title || `YouTube Track (${it.videoId})`,
+      artist: "YouTube Stream",
+      duration: it.duration && it.duration > 0 ? it.duration : 0,
+      thumbnailUrl: `https://img.youtube.com/vi/${it.videoId}/hqdefault.jpg`,
+      addedBy: {
+        participantId: participant.id,
+        username: participant.username,
+        avatar: participant.avatar,
+      },
+      addedAt: now + idx,
+    }));
+
+    room.queue.push(...newItems);
+    if (wasIdle && newItems[0]) {
+      room.currentPlaybackState = {
+        videoId: newItems[0].videoId,
+        status: "playing",
+        position: 0,
+        updatedAt: now,
+        revision: room.currentPlaybackState.revision + 1,
+      };
+    }
+
+    const updated = await this.repo.update(room);
+    return { room: updated, addedCount: newItems.length, playbackStarted: wasIdle };
+  }
+
+  /**
    * Updates duration of a queue track when verified by the player.
    */
   async updateQueueItemDuration(roomId: string, videoId: string, duration: number): Promise<Room | null> {

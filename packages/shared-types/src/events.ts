@@ -45,6 +45,10 @@ export interface ClientToServerEvents {
     data: { videoId: string; title?: string; duration?: number },
     callback: (response: { ok: boolean; queueItem?: QueueItem; error?: string }) => void
   ) => void;
+  "queue:add-batch": (
+    data: { items: Array<{ videoId: string; title?: string; duration?: number }> },
+    callback: (response: { ok: boolean; addedCount?: number; error?: string }) => void
+  ) => void;
   "queue:remove": (
     data: { queueItemId: string },
     callback: (response: { ok: boolean; error?: string }) => void

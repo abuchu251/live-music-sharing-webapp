@@ -11,11 +11,17 @@ import {
   Search,
   Loader2,
   X,
+  ListMusic,
 } from "lucide-react";
-import { extractYouTubeVideoId } from "../../utils/youtube";
+import { extractYouTubeVideoId, extractYouTubePlaylistId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
 import { formatChatContent } from "../../utils/text";
-import { searchYouTube, type YouTubeSearchResult } from "../../services/api";
+import {
+  searchYouTubeWithMode,
+  getYouTubePlaylistTracks,
+  type YouTubeSearchResult,
+  type YouTubePlaylistResult,
+} from "../../services/api";
 import type { QueueItem, ChatMessage } from "@synctune/shared-types";
 import type { MockParticipant } from "./mockData";
 
@@ -29,6 +35,7 @@ export interface RoomSidebarProps {
   participants: MockParticipant[];
   chatMessages: ChatMessage[];
   onAddSong: (title: string, videoId: string, duration?: number) => void;
+  onAddSongsBatch?: (items: Array<{ videoId: string; title?: string; duration?: number }>) => void;
   onRemoveSong: (songId: string) => void;
   onSendMessage: (content: string) => void;
   onPlaySong?: (song: QueueItem, index: number) => void;
@@ -56,6 +63,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   participants,
   chatMessages,
   onAddSong,
+  onAddSongsBatch,
   onRemoveSong,
   onSendMessage,
   onPlaySong,
@@ -84,8 +92,12 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
   const [newSongInput, setNewSongInput] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [searchMode, setSearchMode] = useState<"video" | "playlist">("video");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
+  const [playlistResults, setPlaylistResults] = useState<YouTubePlaylistResult[]>([]);
+  const [isPlaylistTracks, setIsPlaylistTracks] = useState(false);
+  const [loadingPlaylistId, setLoadingPlaylistId] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -156,31 +168,99 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
     const rawInput = newSongInput.trim();
     if (!rawInput) return;
 
-    const extracted = extractYouTubeVideoId(rawInput);
-    if (extracted) {
-      onAddSong(`YouTube Track (${extracted})`, extracted);
+    const extractedVideo = extractYouTubeVideoId(rawInput);
+    const extractedPlaylist = extractYouTubePlaylistId(rawInput);
+
+    // Direct single video import (when not explicitly in playlist mode with a ?list= param)
+    if (extractedVideo && !(extractedPlaylist && searchMode === "playlist")) {
+      onAddSong(`YouTube Track (${extractedVideo})`, extractedVideo);
       setNewSongInput("");
       setShowAddForm(false);
       setSearchResults([]);
+      setPlaylistResults([]);
+      setIsPlaylistTracks(false);
       setSearchError(null);
       return;
     }
 
-    // Execute live YouTube Search
+    // Execute live YouTube Search or Playlist Link Import
     setIsSearching(true);
     setSearchError(null);
+    setSearchResults([]);
+    setPlaylistResults([]);
+    setIsPlaylistTracks(false);
     try {
-      const results = await searchYouTube(rawInput);
-      setSearchResults(results);
-      if (results.length === 0) {
-        setSearchError("No YouTube videos found matching your search.");
+      const response = await searchYouTubeWithMode(rawInput, extractedPlaylist ? "playlist" : searchMode);
+      if (response.kind === "playlist-tracks") {
+        setSearchResults(response.results);
+        setIsPlaylistTracks(true);
+        if (response.results.length === 0) {
+          setSearchError("No embeddable videos found in this playlist.");
+        }
+      } else if (response.kind === "playlists") {
+        setPlaylistResults(response.playlists);
+        if (response.playlists.length === 0) {
+          setSearchError("No YouTube playlists found matching your search.");
+        }
+      } else {
+        setSearchResults(response.results);
+        if (response.results.length === 0) {
+          setSearchError("No YouTube videos found matching your search.");
+        }
       }
     } catch (err: unknown) {
       setSearchError(err instanceof Error ? err.message : "Failed to search YouTube.");
-      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleOpenPlaylist = async (playlistId: string, importAll = false) => {
+    setLoadingPlaylistId(playlistId);
+    setSearchError(null);
+    try {
+      const tracks = await getYouTubePlaylistTracks(playlistId);
+      if (tracks.length === 0) {
+        setSearchError("No embeddable tracks found in this playlist.");
+        return;
+      }
+      if (importAll && onAddSongsBatch) {
+        onAddSongsBatch(tracks.map((t) => ({ videoId: t.videoId, title: t.title, duration: t.duration })));
+        setPlaylistResults([]);
+        setSearchResults([]);
+        setNewSongInput("");
+        setShowAddForm(false);
+      } else {
+        setPlaylistResults([]);
+        setSearchResults(tracks);
+        setIsPlaylistTracks(true);
+      }
+    } catch (err: unknown) {
+      setSearchError(err instanceof Error ? err.message : "Failed to load playlist tracks.");
+    } finally {
+      setLoadingPlaylistId(null);
+    }
+  };
+
+  const handleImportAllDisplayed = () => {
+    if (searchResults.length === 0) return;
+    if (onAddSongsBatch) {
+      onAddSongsBatch(
+        searchResults.map((item) => ({
+          videoId: item.videoId,
+          title: item.title,
+          duration: item.duration,
+        }))
+      );
+    } else {
+      for (const item of searchResults) {
+        onAddSong(item.title, item.videoId, item.duration);
+      }
+    }
+    setSearchResults([]);
+    setIsPlaylistTracks(false);
+    setNewSongInput("");
+    setShowAddForm(false);
   };
 
   const handleChatSubmit = (e: React.FormEvent) => {
@@ -291,11 +371,54 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
           {/* Add Song Form Drawer */}
           {showAddForm && (
             <div className="mb-2 p-3 rounded-lg bg-surface-container-low border border-outline-variant flex flex-col gap-2.5 animate-in fade-in">
+              {/* Tracks / Playlists Mode Toggle */}
+              <div className="flex items-center gap-1 p-0.5 rounded-md bg-surface-container border border-outline-variant/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode("video");
+                    setPlaylistResults([]);
+                    setSearchResults([]);
+                    setIsPlaylistTracks(false);
+                    setSearchError(null);
+                  }}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
+                    searchMode === "video"
+                      ? "bg-surface-container-lowest text-on-surface shadow-xs"
+                      : "text-tertiary hover:text-on-surface"
+                  }`}
+                >
+                  Tracks
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode("playlist");
+                    setPlaylistResults([]);
+                    setSearchResults([]);
+                    setIsPlaylistTracks(false);
+                    setSearchError(null);
+                  }}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                    searchMode === "playlist"
+                      ? "bg-surface-container-lowest text-on-surface shadow-xs"
+                      : "text-tertiary hover:text-on-surface"
+                  }`}
+                >
+                  <ListMusic className="w-3 h-3 text-primary" />
+                  <span>Playlists</span>
+                </button>
+              </div>
+
               <form onSubmit={handleAddSongSubmit} className="flex gap-1.5">
                 <div className="relative flex-1">
                   <input
                     type="text"
-                    placeholder="Search YouTube songs or paste a link..."
+                    placeholder={
+                      searchMode === "playlist"
+                        ? "Search playlists or paste playlist link..."
+                        : "Search songs, paste video or playlist link..."
+                    }
                     value={newSongInput}
                     onChange={(e) => {
                       setNewSongInput(e.target.value);
@@ -311,6 +434,8 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                       onClick={() => {
                         setNewSongInput("");
                         setSearchResults([]);
+                        setPlaylistResults([]);
+                        setIsPlaylistTracks(false);
                         setSearchError(null);
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-tertiary hover:text-on-surface p-0.5 cursor-pointer"
@@ -326,6 +451,8 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 >
                   {isSearching ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : extractYouTubePlaylistId(newSongInput.trim()) && (searchMode === "playlist" || !extractYouTubeVideoId(newSongInput.trim())) ? (
+                    "Load"
                   ) : extractYouTubeVideoId(newSongInput.trim()) ? (
                     "Import"
                   ) : (
@@ -335,12 +462,17 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
               </form>
 
               {/* Direct Link Hint */}
-              {extractYouTubeVideoId(newSongInput.trim()) && (
+              {extractYouTubePlaylistId(newSongInput.trim()) && (searchMode === "playlist" || !extractYouTubeVideoId(newSongInput.trim())) ? (
+                <div className="flex items-center gap-1.5 text-[11px] text-secondary font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                  <span>YouTube playlist link detected — click Load to import tracks!</span>
+                </div>
+              ) : extractYouTubeVideoId(newSongInput.trim()) ? (
                 <div className="flex items-center gap-1.5 text-[11px] text-secondary font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
                   <span>Direct YouTube link detected — ready to import immediately!</span>
                 </div>
-              )}
+              ) : null}
 
               {/* Error Message */}
               {searchError && (
@@ -349,12 +481,86 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                 </div>
               )}
 
-              {/* Live Search Results List */}
-              {searchResults.length > 0 && (
+              {/* Playlist Search Results List */}
+              {playlistResults.length > 0 && (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 pt-1 border-t border-outline-variant">
                   <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider block">
-                    YouTube Results ({searchResults.length})
+                    YouTube Playlists ({playlistResults.length})
                   </span>
+                  {playlistResults.map((pl) => (
+                    <div
+                      key={pl.playlistId}
+                      className="p-1.5 rounded-md bg-surface-container-lowest border border-outline-variant hover:border-primary/40 flex items-center justify-between gap-2 transition-all"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {pl.thumbnailUrl ? (
+                          <img
+                            src={pl.thumbnailUrl}
+                            alt={pl.title}
+                            className="w-12 h-9 object-cover rounded shrink-0 bg-surface-container"
+                          />
+                        ) : (
+                          <div className="w-12 h-9 rounded shrink-0 bg-surface-container flex items-center justify-center text-tertiary">
+                            <ListMusic className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-on-surface truncate">
+                            {pl.title}
+                          </p>
+                          <p className="font-mono text-[10px] text-tertiary truncate">
+                            {pl.channelTitle}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          disabled={loadingPlaylistId === pl.playlistId}
+                          onClick={() => handleOpenPlaylist(pl.playlistId, false)}
+                          className="px-2 py-1 text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface rounded cursor-pointer disabled:opacity-50"
+                          title="Preview tracks in playlist"
+                        >
+                          Tracks
+                        </button>
+                        <button
+                          type="button"
+                          disabled={loadingPlaylistId === pl.playlistId}
+                          onClick={() => handleOpenPlaylist(pl.playlistId, true)}
+                          className="px-2 py-1 text-[11px] font-semibold bg-primary hover:bg-primary-container text-white rounded cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                          title="Import all tracks to queue"
+                        >
+                          {loadingPlaylistId === pl.playlistId ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Plus className="w-3 h-3" />
+                          )}
+                          <span>All</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Live Search / Playlist Tracks Results List */}
+              {searchResults.length > 0 && (
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 pt-1 border-t border-outline-variant">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
+                      {isPlaylistTracks ? `Playlist Tracks (${searchResults.length})` : `YouTube Results (${searchResults.length})`}
+                    </span>
+                    {isPlaylistTracks && (
+                      <button
+                        type="button"
+                        onClick={handleImportAllDisplayed}
+                        className="px-2 py-0.5 text-[10px] font-semibold bg-primary hover:bg-primary-container text-white rounded cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add All ({searchResults.length})</span>
+                      </button>
+                    )}
+                  </div>
                   {searchResults.map((item) => (
                     <div
                       key={item.videoId}
@@ -398,6 +604,8 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                   onClick={() => {
                     setShowAddForm(false);
                     setSearchResults([]);
+                    setPlaylistResults([]);
+                    setIsPlaylistTracks(false);
                     setSearchError(null);
                   }}
                   className="hover:text-on-surface cursor-pointer"

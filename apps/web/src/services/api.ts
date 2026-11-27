@@ -157,12 +157,59 @@ export interface YouTubeSearchResult {
   duration?: number;
 }
 
+export interface YouTubePlaylistResult {
+  playlistId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+}
+
+export interface YouTubeSearchResponse {
+  kind: "videos" | "playlists" | "playlist-tracks";
+  results: YouTubeSearchResult[];
+  playlists: YouTubePlaylistResult[];
+  playlistId?: string;
+}
+
 export async function searchYouTube(query: string): Promise<YouTubeSearchResult[]> {
   const res = await request<{ ok: boolean; results?: YouTubeSearchResult[]; error?: string }>(
     `/youtube/search?q=${encodeURIComponent(query)}`
   );
   if (!res.ok) {
     throw new Error(res.error || "Failed to search YouTube");
+  }
+  return res.results || [];
+}
+
+export async function searchYouTubeWithMode(
+  query: string,
+  type: "video" | "playlist" = "video"
+): Promise<YouTubeSearchResponse> {
+  const res = await request<{
+    ok: boolean;
+    kind?: "videos" | "playlists" | "playlist-tracks";
+    results?: YouTubeSearchResult[];
+    playlists?: YouTubePlaylistResult[];
+    playlistId?: string;
+    error?: string;
+  }>(`/youtube/search?q=${encodeURIComponent(query)}&type=${type}`);
+  if (!res.ok) {
+    throw new Error(res.error || "Failed to search YouTube");
+  }
+  return {
+    kind: res.kind || (type === "playlist" ? "playlists" : "videos"),
+    results: res.results || [],
+    playlists: res.playlists || [],
+    playlistId: res.playlistId,
+  };
+}
+
+export async function getYouTubePlaylistTracks(listId: string): Promise<YouTubeSearchResult[]> {
+  const res = await request<{ ok: boolean; results?: YouTubeSearchResult[]; error?: string }>(
+    `/youtube/playlist?listId=${encodeURIComponent(listId)}`
+  );
+  if (!res.ok) {
+    throw new Error(res.error || "Failed to load YouTube playlist");
   }
   return res.results || [];
 }

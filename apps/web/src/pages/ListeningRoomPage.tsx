@@ -568,6 +568,16 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
     });
   };
 
+  const handleAddSongsBatch = (items: Array<{ videoId: string; title?: string; duration?: number }>) => {
+    if (items.length === 0) return;
+    const socket = getSocket();
+    socket.emit("queue:add-batch", { items }, (res) => {
+      if (!res.ok) {
+        alert(res.error || "Failed to import playlist.");
+      }
+    });
+  };
+
   const handleRemoveSong = (songId: string) => {
     const socket = getSocket();
     socket.emit("queue:remove", { queueItemId: songId }, (res) => {
@@ -989,6 +999,7 @@ export const ListeningRoomPage: React.FC<ListeningRoomPageProps> = ({ roomIdOver
               participants={sidebarParticipants}
               chatMessages={chatMessages}
               onAddSong={handleAddSong}
+              onAddSongsBatch={handleAddSongsBatch}
               onRemoveSong={handleRemoveSong}
               onReorderQueue={handleReorderQueue}
               onSendMessage={handleSendMessage}
