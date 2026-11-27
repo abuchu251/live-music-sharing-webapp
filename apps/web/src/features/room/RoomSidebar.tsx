@@ -12,6 +12,7 @@ import {
   Loader2,
   X,
   ListMusic,
+  ArrowLeft,
 } from "lucide-react";
 import { extractYouTubeVideoId, extractYouTubePlaylistId } from "../../utils/youtube";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -231,7 +232,6 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
         setNewSongInput("");
         setShowAddForm(false);
       } else {
-        setPlaylistResults([]);
         setSearchResults(tracks);
         setIsPlaylistTracks(true);
       }
@@ -482,7 +482,7 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
               )}
 
               {/* Playlist Search Results List */}
-              {playlistResults.length > 0 && (
+              {playlistResults.length > 0 && !isPlaylistTracks && (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 pt-1 border-t border-outline-variant">
                   <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider block">
                     YouTube Playlists ({playlistResults.length})
@@ -518,10 +518,13 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
                           type="button"
                           disabled={loadingPlaylistId === pl.playlistId}
                           onClick={() => handleOpenPlaylist(pl.playlistId, false)}
-                          className="px-2 py-1 text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface rounded cursor-pointer disabled:opacity-50"
+                          className="px-2 py-1 text-[11px] font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface rounded cursor-pointer flex items-center gap-1 disabled:opacity-50"
                           title="Preview tracks in playlist"
                         >
-                          Tracks
+                          {loadingPlaylistId === pl.playlistId && (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          )}
+                          <span>Tracks</span>
                         </button>
                         <button
                           type="button"
@@ -547,9 +550,26 @@ export const RoomSidebar: React.FC<RoomSidebarProps> = ({
               {searchResults.length > 0 && (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5 pt-1 border-t border-outline-variant">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
-                      {isPlaylistTracks ? `Playlist Tracks (${searchResults.length})` : `YouTube Results (${searchResults.length})`}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {isPlaylistTracks && playlistResults.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchResults([]);
+                            setIsPlaylistTracks(false);
+                            setSearchError(null);
+                          }}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold bg-surface-container hover:bg-surface-container-high text-on-surface rounded cursor-pointer flex items-center gap-0.5"
+                          title="Back to playlist results"
+                        >
+                          <ArrowLeft className="w-3 h-3" />
+                          <span>Back</span>
+                        </button>
+                      )}
+                      <span className="font-mono text-[10px] uppercase text-tertiary font-bold tracking-wider">
+                        {isPlaylistTracks ? `Playlist Tracks (${searchResults.length})` : `YouTube Results (${searchResults.length})`}
+                      </span>
+                    </div>
                     {isPlaylistTracks && (
                       <button
                         type="button"
